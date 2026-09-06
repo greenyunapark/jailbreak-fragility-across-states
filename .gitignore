@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment variables / API keys
+.env
+.env.*
+
+# Model weights
+*.pt
+*.pth
+*.bin
+*.ckpt
+*.safetensors
+
+# Experiment outputs
+outputs/
+results/
+
+# Logs
+*.log
+wandb/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
