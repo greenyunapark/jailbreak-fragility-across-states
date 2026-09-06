@@ -1,4 +1,4 @@
-# Publicly Shared System Prompts
+# User Shared System Prompts
 
 ## Table 29. Full text of the 15 publicly shared system prompts used in Section 6.3
 
