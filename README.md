@@ -1,4 +1,8 @@
-# state-driven-jailbreak
+# The Fragility of Jailbreak Robustness Across Operational States
+
+Official code and experimental artifacts for
+**"The Fragility of Jailbreak Robustness Across Operational States"**
+(Findings of EMNLP 2026).
 
 Code for evaluating jailbreak robustness as a function of the model's operational state. We propose a state-conditioned framework that analyzes how variation in model state, induced by ordinary system prompts, affects jailbreak susceptibility under fixed attacks.
 
