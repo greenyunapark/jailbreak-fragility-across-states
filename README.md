@@ -1,236 +1,339 @@
 # The Fragility of Jailbreak Robustness Across Operational States
 
-Official code and experimental artifacts for
-**"The Fragility of Jailbreak Robustness Across Operational States"**
-(Findings of EMNLP 2026).
+Official code and experimental artifacts for:
 
-Code for evaluating jailbreak robustness as a function of the model's operational state. We propose a state-conditioned framework that analyzes how variation in model state, induced by ordinary system prompts, affects jailbreak susceptibility under fixed attacks.
+**The Fragility of Jailbreak Robustness Across Operational States**  
+*Findings of EMNLP 2026*
+
+**Yuna Park, Hwang Youn Kim, Yujin Kim, Won Woo Ro, Suhyun Kim, Jae-In Hwang**
+
+[📄 arXiv](https://arxiv.org/abs/2608.30748)
+
+---
+
+<p align="center">
+  <a href="intro_figure.pdf">
+    <img src="intro_figure.png" width="900"
+         alt="Illustration of state-induced robustness shift">
+  </a>
+</p>
+
+<p align="center">
+  <em>
+    Same attack. Same model. Only the system prompt changes.
+  </em>
+</p>
 
 ## Overview
 
-Most jailbreak evaluations assume a *vanilla* model state — a default configuration with no prior context. In practice, LLMs are deployed with system prompts that shape their operational state. This work shows that the same jailbreak artifact can have substantially different effects depending on the model's state.
+Jailbreak robustness is commonly characterized using a single attack success
+rate (ASR) measured under a default, or *vanilla*, model configuration.
 
-We propose a **state-conditioned evaluation framework** that:
-1. Generates jailbreak artifacts under the vanilla state (Stage 1)
-2. Applies those artifacts to persona-conditioned states and measures the resulting ASR shift (Stage 2)
+In this work, we show that jailbreak robustness can vary substantially when
+only the model's **context-induced operational state** is changed, while the
+target model and jailbreak artifact remain fixed. We refer to this phenomenon
+as **state-induced robustness shift**.
 
-Using **Big Five personality traits** (OCEAN) as controlled state approximations, we demonstrate that ordinary system prompts alone can shift Attack Success Rate (ASR) by up to 56 percentage points — without any modification to the attack itself.
+We systematically study this phenomenon across seven aligned language models
+and three representative jailbreak attacks. In some settings, changing only
+the operational state changes ASR by as much as **56 percentage points
+(2% → 58%)**, without modifying the jailbreak artifact itself.
+
+We further show that state-dependent robustness variation is systematically
+associated with differences in hidden representations along a
+**refusal-related axis**, providing a predictive representation-level account
+of the observed robustness shifts.
+
+This repository provides the code and experimental artifacts associated with
+our study, including operational-state prompts, LAA-based evaluation code,
+and refusal-related representation analysis.
+
+---
+
+## Key Idea
+
+Our evaluation separates **attack generation** from **operational-state
+evaluation**:
+
+1. A jailbreak artifact is generated under the vanilla operational state.
+2. The target model and jailbreak artifact are kept fixed.
+3. Only the system prompt used to induce the operational state is changed.
+4. The same artifact is evaluated across different operational states.
+5. Attack success rates are compared across states.
+
+This setup allows us to examine whether a robustness measurement obtained in
+one operational state remains stable when the model's context changes.
+
+---
 
 ## Repository Structure
 
-```
-state-driven-jailbreak/
+```text
+.
 ├── attacks/
-│   ├── generate_suffixes.py            # Stage 1: suffix generation under vanilla state
-│   ├── evaluate_personas.py            # Stage 2: persona-conditioned evaluation
-│   ├── laa_attack.py                   # LAA core logic
-│   ├── model_loader.py                 # Model loading and prompt formatting
-│   ├── language_models.py              # GPT / HuggingFace wrappers
-│   ├── prompts.py                      # Attack prompt templates
-│   ├── personality_prompts.py          # Big Five persona prompts
-│   ├── config.py                       # Model paths, decoding settings, safe prompt
-|   ├── judges.py                       # Rule-based judge
-│   └── utils.py                        # Utility functions
+│   ├── generate_suffixes.py
+│   ├── evaluate_personas.py
+│   ├── laa_attack.py
+│   ├── model_loader.py
+│   ├── language_models.py
+│   ├── prompts.py
+│   ├── personality_prompts.py
+│   ├── judges.py
+│   ├── config.py
+│   └── utils.py
+│
+├── datasets/
+│   └── advbench_520_classified.csv
+│
+├── prompts/
+│   ├── big_five_paraphrases.md
+│   └── user_shared_prompts.md
+│
 ├── refusal_analysis/
-│   ├── extract_hidden_states.py        # Step 1: extract hidden states (Llama-2-13B)
-│   ├── train_probe.py                  # Step 2: train probe + compute projections
-│   ├── analyze_paraphrase_projection.py # Step 3: paraphrase projection analysis
-│   └── personality_prompts_semantic.py # Paraphrase prompts (10 per trait)
-└── .gitignore
+│   ├── extract_hidden_states.py
+│   ├── train_probe.py
+│   ├── analyze_paraphrase_projection.py
+│   └── personality_prompts_semantic.py
+│
+├── intro_figure.pdf
+├── intro_figure.png
+├── THIRD_PARTY_NOTICES.md
+├── .gitignore
+└── README.md
 ```
 
-## Setup
+---
 
-```bash
-pip install torch transformers fastchat openai tiktoken anthropic pandas tqdm bert-score
+## Released Artifacts
+
+### Operational-State Prompts
+
+The prompts used to instantiate and analyze operational states are provided in
+[`prompts/`](prompts/).
+
+Currently released prompt artifacts include:
+
+- [`big_five_paraphrases.md`](prompts/big_five_paraphrases.md)  
+  Paraphrased variants of the five Big Five persona prompts used in the
+  paraphrase robustness analysis.
+
+- [`user_shared_prompts.md`](prompts/user_shared_prompts.md)  
+  User-shared role prompts used to evaluate whether state-induced robustness
+  shifts extend beyond the controlled Big Five prompt family.
+
+The original Big Five persona prompts used for state conditioning are also
+included in
+[`attacks/personality_prompts.py`](attacks/personality_prompts.py).
+
+The Big Five prompts are used as a systematic and reproducible instrument for
+inducing controlled state variation. They are **not** intended to represent a
+canonical or comprehensive distribution of real-world system prompts.
+
+---
+
+## LAA-Based Operational-State Evaluation
+
+The currently released jailbreak evaluation code focuses on experiments based
+on **LLM Adaptive Attacks (LAA)**.
+
+The original LAA implementation is adapted so that a jailbreak artifact can be
+generated under the vanilla state and subsequently evaluated across different
+system-prompt-induced operational states.
+
+The main scripts are:
+
+### 1. Jailbreak Artifact Generation
+
+[`attacks/generate_suffixes.py`](attacks/generate_suffixes.py)
+
+Generates jailbreak artifacts using the LAA attack.
+
+In the main experimental setting of the paper, jailbreak artifacts are
+generated under the vanilla operational state.
+
+### 2. State-Conditioned Evaluation
+
+[`attacks/evaluate_personas.py`](attacks/evaluate_personas.py)
+
+Evaluates pre-generated jailbreak artifacts across different operational
+states while keeping the target model and attack artifact fixed.
+
+### 3. Operational-State Prompts
+
+[`attacks/personality_prompts.py`](attacks/personality_prompts.py)
+
+Contains the Big Five persona prompts used to induce the five controlled
+non-vanilla operational states:
+
+- Openness
+- Conscientiousness
+- Extraversion
+- Agreeableness
+- Neuroticism
+
+### 4. Model and Evaluation Utilities
+
+The remaining files in [`attacks/`](attacks/) provide model loading,
+prompt formatting, attack logic, judging, and shared utilities.
+
+---
+
+## Models and Attacks in the Paper
+
+The paper evaluates seven aligned language models:
+
+- Llama-2-7B-Chat
+- Llama-2-13B-Chat
+- Llama-3-8B-Instruct
+- Llama-3.1-8B-Instruct
+- Qwen2.5-7B-Instruct
+- Mistral-7B-Instruct
+- Vicuna-7B-v1.5
+
+and three representative jailbreak attacks:
+
+- **PAIR** — black-box
+- **LAA** — gray-box
+- **AutoDAN** — white-box
+
+The code currently organized in this repository focuses on the
+**LAA-based experimental pipeline**.
+
+For PAIR and AutoDAN, please refer to their original implementations:
+
+- [PAIR](https://github.com/patrickrchao/JailbreakingLLMs)
+- [LAA](https://github.com/tml-epfl/llm-adaptive-attacks)
+- [AutoDAN](https://github.com/SheltonLiu-N/AutoDAN)
+
+---
+
+## Representation-Level Analysis
+
+The [`refusal_analysis/`](refusal_analysis/) directory contains the code used
+for the representation-level analyses in the paper.
+
+We investigate whether operational-state variation is associated with
+systematic changes in hidden representations along a refusal-related axis.
+
+The analysis pipeline consists of three main stages.
+
+### 1. Hidden-State Extraction
+
+[`refusal_analysis/extract_hidden_states.py`](refusal_analysis/extract_hidden_states.py)
+
+Extracts hidden representations immediately before response generation across
+different operational states.
+
+### 2. Refusal-Related Probe
+
+[`refusal_analysis/train_probe.py`](refusal_analysis/train_probe.py)
+
+Trains a logistic-regression probe to distinguish jailbreak success and
+failure from hidden representations.
+
+The learned weight vector is used as a **refusal-related direction**.
+
+### 3. Projection Analysis
+
+[`refusal_analysis/analyze_paraphrase_projection.py`](refusal_analysis/analyze_paraphrase_projection.py)
+
+Analyzes how representations induced by different operational-state prompts
+project onto the learned refusal-related direction, including the paraphrase
+analysis reported in the paper.
+
+Our representation analysis should be interpreted as a **predictive and
+correlational account** of state-dependent jailbreak robustness, rather than
+as evidence of a causal mechanism.
+
+---
+
+## Datasets
+
+The [`datasets/`](datasets/) directory contains data used in additional
+analyses reported in the paper.
+
+The repository currently includes:
+
+- `advbench_520_classified.csv` — AdvBench queries with harm-category
+  annotations used for the scope analysis.
+
+The main experiments in the paper use the AdvBench evaluation subset together
+with additional evaluations on MaliciousInstruct and JailbreakBench.
+
+Please refer to the original dataset releases for their respective licenses
+and terms of use.
+
+---
+
+## Dependencies
+
+The codebase is written in Python and uses libraries including:
+
+- PyTorch
+- Hugging Face Transformers
+- FastChat
+- OpenAI
+- pandas
+- NumPy
+- scikit-learn
+- tqdm
+- BERTScore
+
+Some evaluated models require access approval and a Hugging Face token.
+
+A version-pinned environment specification and verified end-to-end
+reproduction commands will be added as the public research code is further
+organized.
+
+---
+
+## Third-Party Code
+
+Parts of the jailbreak attack implementation in this repository are adapted
+from:
+
+**Jailbreaking Leading Safety-Aligned LLMs with Simple Adaptive Attacks**  
+Maksym Andriushchenko, Francesco Croce, and Nicolas Flammarion.
+
+Original repository:  
+https://github.com/tml-epfl/llm-adaptive-attacks
+
+The LAA implementation is distributed under the MIT License. The original LAA
+repository itself contains code partially based on the PAIR implementation.
+
+Our modifications support the operational-state evaluation setting studied in
+this work, including system-prompt conditioning and evaluation of fixed
+jailbreak artifacts across multiple operational states.
+
+See
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+for attribution and licensing information.
+
+---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@article{park2026fragility,
+  title   = {The Fragility of Jailbreak Robustness Across Operational States},
+  author  = {Park, Yuna and Kim, Hwang Youn and Kim, Yujin and Ro, Won Woo
+             and Kim, Suhyun and Hwang, Jae-In},
+  journal = {arXiv preprint arXiv:2608.30748},
+  year    = {2026}
+}
 ```
 
-Set your API keys as environment variables:
+The paper was accepted to **Findings of EMNLP 2026**. The official ACL
+Anthology citation will be added after publication.
 
-```bash
-export OPENAI_API_KEY="your_openai_api_key"
-export HF_TOKEN="your_huggingface_token"   # required for gated models (Llama-2, etc.)
-```
-
-## System Prompt Configuration
-
-This codebase follows a **vanilla-by-default** design: the model's system prompt is **empty** unless explicitly specified.
-
-| Flag | System prompt |
-|---|---|
-| *(none)* | `""` — vanilla state |
-| `--safe_prompt "..."` | The provided safety prompt |
-
-When a persona is also applied (Stage 2), the final system message depends on `--sys_mode`:
-
-| `sys_mode` | Result |
-|---|---|
-| `replace` | persona only |
-| `append` | `safe_prompt` + `"\n\n"` + persona |
-| `prepend` | persona + `"\n\n"` + `safe_prompt` |
-
-The safety prompt used in our experiments (Appendix B.3) is the standard Llama-2 safety prompt:
-
-```
-You are a helpful, respectful and honest assistant. Always answer as helpfully
-as possible, while being safe. ...
-```
-
-## Usage
-
-### Stage 1: Generate Suffixes (vanilla state)
-
-Optimize adversarial suffixes under the vanilla state using LAA.
-
-```bash
-# Vanilla (no system prompt)
-python attacks/generate_suffixes.py \
-    --target_model llama2-7b \
-    --csv_path advbench_50.csv \
-    --sys_mode replace \
-    --results_dir results/laa
-
-# With safety prompt
-python attacks/generate_suffixes.py \
-    --target_model llama2-7b \
-    --csv_path advbench_50.csv \
-    --sys_mode replace \
-    --safe_prompt "You are a helpful, respectful and honest assistant..." \
-    --results_dir results/laa
-```
-
-**Arguments:**
-
-| Argument | Default | Description |
-|---|---|---|
-| `--target_model` | — | Target model key (see Supported Models below) |
-| `--csv_path` | `advbench_50.csv` | Dataset CSV with a `goal` column |
-| `--sys_mode` | `replace` | System prompt combination mode: `replace`, `append`, `prepend` |
-| `--safe_prompt` | `""` | Safety system prompt. Empty = vanilla state |
-| `--results_dir` | `results/laa` | Output directory |
-| `--n-restarts` | `1` | Number of random restarts |
-
-### Stage 2: Evaluate Across Persona-Conditioned States
-
-Apply pre-generated suffixes to all Big Five persona-conditioned states.
-
-```bash
-# Vanilla baseline
-python attacks/evaluate_personas.py \
-    --target_model llama2-7b \
-    --dataset advbench \
-    --sys_mode replace \
-    --results_dir results/laa \
-    --temp 0.0
-
-# Persona + safety prompt (Appendix B.3 setting)
-python attacks/evaluate_personas.py \
-    --target_model llama2-7b \
-    --dataset advbench \
-    --sys_mode append \
-    --safe_prompt "You are a helpful, respectful and honest assistant..." \
-    --results_dir results/laa \
-    --temp 0.0
-```
-
-**Arguments:**
-
-| Argument | Default | Description |
-|---|---|---|
-| `--target_model` | — | Target model key |
-| `--dataset` | — | Dataset subdirectory name under `pure_suffix/` |
-| `--sys_mode` | `replace` | System prompt combination mode |
-| `--safe_prompt` | `""` | Safety system prompt. Empty = vanilla state |
-| `--results_dir` | `results/laa` | Output directory |
-| `--temp` | `0.0` | Decoding temperature |
-
-### GPT-4 Judge (optional)
-
-```bash
-python evaluation/run_gpt_judge.py \
-    --input_csv results/laa/temp0.0_llama2-7b_replace_<timestamp>.csv \
-    --judge_model gpt-4-0613
-```
-
-## Refusal Analysis (Section 6)
-
-The `refusal_analysis/` folder contains code for the representation-level analysis in Section 6 and Appendix D.
-
-```
-refusal_analysis/
-├── extract_hidden_states.py        # Step 1: extract hidden states from Llama-2-13B
-├── train_probe.py                  # Step 2: train logistic regression probe + compute projections
-└── analyze_paraphrase_projection.py # Step 3: paraphrase-level projection analysis (Appendix D.3)
-```
-
-### Step 1: Extract Hidden States
-
-```bash
-python refusal_analysis/extract_hidden_states.py \
-    --original_csv  results/laa/llama2-13b_replace_asr.csv \
-    --semantic_dir  results_semantic/Llama2-13b \
-    --dataset       advbench \
-    --sys_mode      replace \
-    --output_dir    probe_data
-```
-
-Outputs `probe_data/hidden_vectors.npz` with hidden states at layers 4 (early), 16 (middle), 32 (late).
-
-### Step 2: Train Probe
-
-```bash
-# Original prompts only (Figure 6)
-python refusal_analysis/train_probe.py \
-    --npz_path    probe_data/hidden_vectors.npz \
-    --output_dir  probe_results \
-    --model       13b \
-    --original_only
-```
-
-Outputs `probe_results/probe_analysis.pdf`, `probe_correlation.csv`, and `probe_directions.npz`.
-
-### Step 3: Analyze Paraphrase Projections
-
-```bash
-python refusal_analysis/analyze_paraphrase_projection.py \
-    --npz_path        probe_data/hidden_vectors.npz \
-    --directions_path probe_results/probe_directions.npz \
-    --output_dir      probe_results
-```
-
-Outputs `paraphrase_projection.pdf` and `paraphrase_projection.csv` (Figure 9, Appendix D.3).
-
-**Note:** `extract_hidden_states.py` requires `personality_prompts_semantic.py`, which contains the 10 paraphrases per Big Five trait used in Section 5.1.
-
-## Supported Models
-
-| Model | Key |
-|---|---|
-| Llama-2-7B-chat | `llama2-7b` |
-| Llama-2-13B-chat | `llama2-13b` |
-| Llama-3-8B-Instruct | `llama3-8b` |
-| Llama-3.1-8B-Instruct | `llama3.1-8b` |
-| Qwen2.5-7B-Instruct | `qwen2.5-7b` |
-| Mistral-7B-Instruct-v0.2 | `mistral-7b` |
-| Vicuna-7B-v1.5 | `vicuna` |
-
-Model paths are configured in `attacks/config.py`.
-
-## Persona Prompts
-
-The Big Five persona prompts are adapted from:
-
-> Jiang et al. (2023). *Evaluating and Inducing Personality in Pre-Trained Language Models.* NeurIPS 2023.
-> [[paper]](https://arxiv.org/abs/2206.07550) [[code]](https://github.com/jianggy/MPI)
-
-All five prompts (O/C/E/A/N) are in `attacks/personality_prompts.py`.
+---
 
 ## Acknowledgements
 
-This codebase builds on the following open-source repositories:
+We thank the authors of the open-source attack implementations and datasets
+used in this work.
 
-| Method | Repository |
-|---|---|
-| LAA (Andriushchenko et al., 2025) | https://github.com/tml-epfl/llm-adaptive-attacks |
-| PAIR (Chao et al., 2025) | https://github.com/patrickrchao/JailbreakingLLMs |
-| AutoDAN (Liu et al., 2024) | https://github.com/SheltonLiu-N/AutoDAN |
+For detailed attribution of reused or adapted code, please see
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
