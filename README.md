@@ -19,9 +19,7 @@ Official code and experimental artifacts for:
 </p>
 
 <p align="center">
-  <em>
-    Same attack. Same model. Only the system prompt changes.
-  </em>
+  <em>Same attack. Same model. Only the system prompt changes.</em>
 </p>
 
 ## Overview
