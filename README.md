@@ -68,6 +68,7 @@ analysis code.
 ├── attacks/
 │   ├── generate_suffixes.py
 │   ├── evaluate_operational_states.py
+│   ├── evaluate_paraphrases.py
 │   ├── evaluate_user_shared_prompts.py
 │   ├── judge_responses.py
 │   ├── laa_attack.py
@@ -176,6 +177,26 @@ provider/account availability; substituting another judge model may change the
 reported ASRs. The Stage 2 script also records a rule-based heuristic label for
 diagnostics, but the GPT-based judge is the evaluation used for the reported
 main ASRs.
+
+## Big Five paraphrase evaluation
+
+After constructing or using the released retained paraphrases, evaluate the
+same fixed LAA suffixes under each paraphrase:
+
+```bash
+python attacks/evaluate_paraphrases.py \
+    --target_model llama2-13b \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --results_dir results/paraphrases/llama2-13b \
+    --temperature 0.0
+```
+
+Each trait is written to a separate subdirectory. Score each response CSV with
+`attacks/judge_responses.py`; when a `prompt_num` column is present, the
+judge script reports ASR separately for each retained paraphrase. These judged
+files can also be consumed by
+`refusal_analysis/extract_hidden_states.py` for the representation-level
+paraphrase analysis.
 
 ## User-shared system prompt evaluation
 
