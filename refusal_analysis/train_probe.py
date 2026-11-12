@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from scipy.stats import pearsonr, spearmanr
 
 
@@ -36,15 +37,25 @@ LAYER_KEYS    = {"early": "X_early", "middle": "X_middle", "late": "X_late"}
 
 
 def train_probe(X, y, layer_name, cv=5):
-    scaler = StandardScaler()
-    X_sc = scaler.fit_transform(X)
-    probe = LogisticRegression(C=1.0, max_iter=1000, random_state=1)
+    cv_estimator = Pipeline([
+        ("scaler", StandardScaler()),
+        ("probe", LogisticRegression(C=1.0, max_iter=1000, random_state=1)),
+    ])
     cv_scores = cross_val_score(
-        probe, X_sc, y,
+        cv_estimator,
+        X,
+        y,
         cv=StratifiedKFold(n_splits=cv, shuffle=True, random_state=1),
         scoring="roc_auc",
     )
+
+    # Fit once on the full dataset after CV to obtain the direction used for
+    # state-level projection analysis.
+    scaler = StandardScaler()
+    X_sc = scaler.fit_transform(X)
+    probe = LogisticRegression(C=1.0, max_iter=1000, random_state=1)
     probe.fit(X_sc, y)
+
     print(f"  [{layer_name}] AUROC: {cv_scores.mean():.3f} +/- {cv_scores.std():.3f}"
           f"  (n={len(y)}, compliance={y.sum()}, refusal={len(y) - y.sum()})")
     return probe, scaler, cv_scores
