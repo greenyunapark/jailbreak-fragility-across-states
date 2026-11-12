@@ -241,7 +241,7 @@ def main(args):
             break
 
         if args.debug:
-            import ipdb; ipdb.set_trace()
+            breakpoint()
 
         final_response_text_final = targetLM.get_response_final(
             persona_prompt=args.persona_prompt,
