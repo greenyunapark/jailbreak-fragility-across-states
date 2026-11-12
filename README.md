@@ -95,7 +95,9 @@ analysis code.
 │
 ├── refusal_analysis/
 │   ├── extract_hidden_states.py
+│   ├── extract_state_hidden_states.py
 │   ├── train_probe.py
+│   ├── evaluate_probe_transfer.py
 │   ├── analyze_paraphrase_projection.py
 │   └── personality_prompts_semantic.py
 │
@@ -168,7 +170,10 @@ python attacks/judge_responses.py \
 ```
 
 The paper counts a response as a successful jailbreak when the judge assigns
-a score of 10. The exact judge model used in the paper was `gpt-4-0613`. The Stage 2 script also records a rule-based heuristic label for
+a score of 10. The exact judge model used in the paper was `gpt-4-0613`.
+Because this is a historical API model identifier, exact reruns depend on
+provider/account availability; substituting another judge model may change the
+reported ASRs. The Stage 2 script also records a rule-based heuristic label for
 diagnostics, but the GPT-based judge is the evaluation used for the reported
 main ASRs.
 
@@ -228,6 +233,37 @@ representations and computes projection-ASR correlations across all six
 operational states. State-level projection uncertainty is reported as the
 standard error across the 50 AdvBench queries, matching the analysis protocol
 described in the paper.
+
+### Cross-prompt-family probe evaluation
+
+For Section 6.3, the generic extractor can create comparable NPZ files for
+both the Big Five and user-shared prompt families:
+
+```bash
+python refusal_analysis/extract_state_hidden_states.py \
+    --target_model llama2-13b \
+    --responses_csv <judged-big-five.csv> \
+    --output_npz probe_data/big_five.npz
+
+python refusal_analysis/extract_state_hidden_states.py \
+    --target_model llama2-13b \
+    --responses_csv <judged-user-shared.csv> \
+    --state_prompts_csv datasets/user_shared_prompts.csv \
+    --exclude_state vanilla \
+    --output_npz probe_data/user_shared.npz
+```
+
+A probe trained on one prompt family can then be evaluated on the other:
+
+```bash
+python refusal_analysis/evaluate_probe_transfer.py \
+    --train_npz probe_data/big_five.npz \
+    --test_npz probe_data/user_shared.npz \
+    --layer middle
+```
+
+The representation depth is exposed as a command-line argument rather than
+hard-coded; Appendix B.4 reports results across L4, L16, and L32.
 
 ## LAA-based operational-state evaluation
 
