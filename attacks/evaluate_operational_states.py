@@ -49,6 +49,7 @@ def run_operational_state_eval(
     target_max_n_tokens: int = 150,
     temperature: float = 0.0,
     safe_prompt: str = "",
+    limit: int | None = None,
 ):
     seed = 1
     random.seed(seed)
@@ -58,6 +59,8 @@ def run_operational_state_eval(
         torch.cuda.manual_seed_all(seed)
 
     df_src = pd.read_csv(suffix_csv, encoding="utf-8-sig")
+    if limit is not None:
+        df_src = df_src.head(limit).copy()
     required = {"index", "goal", "suffix"}
     missing = required.difference(df_src.columns)
     if missing:
@@ -145,6 +148,12 @@ if __name__ == "__main__":
     parser.add_argument("--target_max_n_tokens", type=int, default=150)
     parser.add_argument("--safe_prompt", type=str, default="")
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Optional number of fixed artifacts to evaluate (useful for smoke tests).",
+    )
     args = parser.parse_args()
 
     run_operational_state_eval(
@@ -156,4 +165,5 @@ if __name__ == "__main__":
         target_max_n_tokens=args.target_max_n_tokens,
         temperature=args.temperature,
         safe_prompt=args.safe_prompt,
+        limit=args.limit,
     )
