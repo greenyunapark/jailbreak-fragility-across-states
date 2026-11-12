@@ -41,6 +41,12 @@ parser.add_argument("--sys_mode", type=str, default="replace",
 parser.add_argument("--safe_prompt", type=str, default="",
                     help="Safety system prompt. Empty by default (vanilla state).")
 parser.add_argument("--n-restarts", type=int, default=1)
+parser.add_argument(
+    "--limit",
+    type=int,
+    default=None,
+    help="Optional number of dataset rows to process (useful for smoke tests).",
+)
 
 
 def calculate_and_save_asr(csv_path):
@@ -87,8 +93,18 @@ def calculate_and_save_asr(csv_path):
         traceback.print_exc()
 
 
-def run_with_personality(csv_path, target_model_name, results_dir_base, sys_mode, n_restarts, safe_prompt=""):
+def run_with_personality(
+    csv_path,
+    target_model_name,
+    results_dir_base,
+    sys_mode,
+    n_restarts,
+    safe_prompt="",
+    limit=None,
+):
     dataset = pd.read_csv(csv_path)
+    if limit is not None:
+        dataset = dataset.head(limit).copy()
     # Stage 1: vanilla only (no persona conditioning during suffix generation)
     p2_descriptions = get_persona_prompts(mode="pure")
 
@@ -189,4 +205,5 @@ if __name__ == "__main__":
         args.sys_mode,
         args.n_restarts,
         safe_prompt=args.safe_prompt,
+        limit=args.limit,
     )
