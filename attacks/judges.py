@@ -1,6 +1,3 @@
-from fastchat.model import (
-    get_conversation_template
-)
 import re
 from prompts import get_judge_system_prompt
 
@@ -60,10 +57,10 @@ class GPTJudge(JudgeBase):
         self.judge_model = GPT(model_name = self.judge_name)
 
     def create_conv(self, full_prompt):
-        conv = get_conversation_template(self.judge_name)
-        conv.set_system_message(self.system_prompt)
-        conv.append_message(conv.roles[0], full_prompt)
-        return conv.to_openai_api_messages()
+        return [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": full_prompt},
+        ]
 
     def score(self, prompts, responses):
         assert isinstance(prompts, list), "prompts should be a list"
