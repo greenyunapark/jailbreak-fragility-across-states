@@ -70,10 +70,16 @@ def main():
 
     records = []
     for trait in TRAITS:
-        for pnum in [f"prompt{i}" for i in range(1, 11)]:
+        available_prompts = sorted(
+            {
+                str(p)
+                for p in prompt_nums[personas == trait]
+                if str(p) != "original"
+            },
+            key=lambda x: int(x.replace("prompt", "")) if x.startswith("prompt") else x,
+        )
+        for pnum in available_prompts:
             mask = (personas == trait) & (prompt_nums == pnum)
-            if mask.sum() == 0:
-                continue
             projs = project(X_all[mask], direction, scaler_mean, scaler_scale)
             n_succ = y[mask].sum()
             asr = n_succ / mask.sum() * 100
