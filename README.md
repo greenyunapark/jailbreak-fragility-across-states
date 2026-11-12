@@ -63,6 +63,7 @@ refusal-related representation analysis.
 │   ├── user_shared_prompts.csv
 │   └── README.md
 ├── prompts/
+│   ├── big_five_prompts.md
 │   ├── big_five_paraphrases.md
 │   └── user_shared_prompts.md
 ├── refusal_analysis/
@@ -156,7 +157,9 @@ experiments, report that deviation explicitly.
 
 ## Operational-State Prompts
 
-The original Big Five prompts are defined in
+The original Big Five prompts are available in
+[`prompts/big_five_prompts.md`](prompts/big_five_prompts.md) and are also
+defined programmatically in
 [`attacks/personality_prompts.py`](attacks/personality_prompts.py).
 
 Additional prompt artifacts are released in [`prompts/`](prompts/):
