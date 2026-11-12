@@ -84,12 +84,20 @@ def main():
         choices=list(LAYER_KEYS),
     )
     parser.add_argument(
-        "--exclude_state",
+        "--exclude_train_state",
+        action="append",
+        default=[],
+        help="Training-state name to exclude; may be supplied multiple times.",
+    )
+    parser.add_argument(
+        "--exclude_test_state",
         action="append",
         default=[],
         help=(
-            "State to exclude from both train and test sets. For the public-"
-            "prompt correlation reported in Section 6.3, exclude vanilla."
+            "Test-state name to exclude; may be supplied multiple times. "
+            "For the public-prompt analysis, the vanilla baseline can be "
+            "excluded from the test prompt family while retaining it in the "
+            "Big Five training set."
         ),
     )
     parser.add_argument(
@@ -99,12 +107,15 @@ def main():
     )
     args = parser.parse_args()
 
-    excluded = set(args.exclude_state)
     X_train, y_train, train_states = load_npz(
-        args.train_npz, args.layer, excluded
+        args.train_npz,
+        args.layer,
+        set(args.exclude_train_state),
     )
     X_test, y_test, test_states = load_npz(
-        args.test_npz, args.layer, excluded
+        args.test_npz,
+        args.layer,
+        set(args.exclude_test_state),
     )
 
     if args.cross_validate:
@@ -127,7 +138,17 @@ def main():
     probe, scaler = fit_probe(X_train, y_train)
     test_prob = probe.predict_proba(scaler.transform(X_test))[:, 1]
     test_auc = roc_auc_score(y_test, test_prob)
-    print(f"Test AUROC: {test_auc:.3f}")
+
+    same_dataset = (
+        args.train_npz == args.test_npz
+        and set(args.exclude_train_state) == set(args.exclude_test_state)
+    )
+    if same_dataset and args.cross_validate:
+        print(
+            f"Full-fit in-sample AUROC (diagnostic only): {test_auc:.3f}"
+        )
+    else:
+        print(f"Test AUROC: {test_auc:.3f}")
 
     rows = state_statistics(
         X_test, y_test, test_states, probe, scaler
