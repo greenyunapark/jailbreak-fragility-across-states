@@ -137,28 +137,98 @@ representation-level analysis code.
 
 ## Requirements
 
-- **Python 3.10** (the repository CI is tested with Python 3.10)
-- Python packages in [`requirements.txt`](requirements.txt)
-- Hugging Face access for gated target models such as Llama-2
-- an OpenAI API key for PAIR generation and GPT-based judging
-- GPU memory appropriate for the selected open-source target model
+- **Python 3.10** (the repository CI uses Python 3.10)
+- a CUDA-capable GPU for the open-source target models
+- Hugging Face access for gated models such as Llama-2
+- an OpenAI API key only when using PAIR generation or GPT-based judging
 
-Install the Python dependencies:
+The Python dependencies are pinned by package family in
+[`requirements.txt`](requirements.txt).
+
+## Installation
+
+Clone the repository and create an isolated environment:
 
 ```bash
+git clone https://github.com/greenyunapark/jailbreak-fragility-across-states.git
+cd jailbreak-fragility-across-states
+
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 pip install -r requirements.txt
+```
+
+On Windows PowerShell, activate the environment with:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
 ```
 
 Set credentials through environment variables rather than editing source code:
 
 ```bash
-export OPENAI_API_KEY=...
 export HF_TOKEN=...
+export OPENAI_API_KEY=...
 ```
 
-See [`.env.example`](.env.example) for the supported variables.
+`HF_TOKEN` is needed for gated Hugging Face models. `OPENAI_API_KEY` is
+needed for PAIR generation and GPT-based judging. See
+[`.env.example`](.env.example) for the supported variables.
 
 ## Quick Start
+
+The fastest repository smoke test is a **single-query LAA run**. It verifies
+that vanilla artifact generation and six-state evaluation are wired together
+without launching the full 50-query experiment.
+
+### 1. Generate one LAA artifact under the vanilla state
+
+```bash
+python attacks/generate_suffixes.py \
+  --target_model llama2-7b \
+  --csv_path datasets/advbench_50.csv \
+  --sys_mode replace \
+  --results_dir results/laa \
+  --limit 1
+```
+
+Expected artifact file:
+
+```text
+results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv
+```
+
+### 2. Re-evaluate that same artifact across operational states
+
+```bash
+python attacks/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --suffix_csv results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv \
+  --results_dir results/laa/smoke_test \
+  --sys_mode replace \
+  --temperature 0.0 \
+  --limit 1
+```
+
+This produces responses for **vanilla + the five Big Five states**. The output
+CSV also includes the rule-based diagnostic label, so the generation/evaluation
+pipeline can be checked without an API judge.
+
+### 3. Optional: run the paper's GPT judge
+
+```bash
+python attacks/judge_responses.py \
+  --responses_csv <smoke-test-output.csv> \
+  --judge_model gpt-4-0613
+```
+
+The paper uses `gpt-4-0613` and counts score 10 as jailbreak success.
+Because this is a historical API model identifier, exact judge reproduction
+depends on provider/account availability. Substituting a newer judge may change
+the reported ASR.
+
+## Running Experiments
 
 All three attacks follow the same evaluation principle:
 
@@ -194,7 +264,8 @@ python attacks/evaluate_operational_states.py \
 ### PAIR
 
 PAIR generation uses the paper-reported attacker model
-`gpt-3.5-turbo-1106` by default.
+`gpt-3.5-turbo-1106` and the official PAIR experimental settings documented
+in [`attacks/pair/README.md`](attacks/pair/README.md).
 
 ```bash
 python attacks/pair/generate_artifacts.py \
@@ -208,12 +279,10 @@ python attacks/pair/evaluate_operational_states.py \
   --results_dir results/pair/llama2-7b
 ```
 
-See [`attacks/pair/README.md`](attacks/pair/README.md) for details.
-
 ### AutoDAN
 
-Run the official AutoDAN HGA implementation under the vanilla state first,
-then convert its JSON output and reuse the optimized artifact across states:
+Run the official AutoDAN HGA implementation under the vanilla state first.
+Then convert its JSON output and reuse the optimized artifact across states:
 
 ```bash
 python attacks/autodan/prepare_artifacts.py \
@@ -227,7 +296,7 @@ python attacks/autodan/evaluate_operational_states.py \
 ```
 
 See [`attacks/autodan/README.md`](attacks/autodan/README.md) for the upstream
-generation step and provenance.
+generation step.
 
 ### Judge any state-evaluation output
 
@@ -236,11 +305,6 @@ python attacks/judge_responses.py \
   --responses_csv <state-evaluation-output.csv> \
   --judge_model gpt-4-0613
 ```
-
-The paper treats a GPT-4 judge score of **10** as jailbreak success. Both
-`gpt-3.5-turbo-1106` and `gpt-4-0613` are historical model identifiers;
-availability now depends on the API account, and substitutions can change the
-reported results.
 
 ## Reproducing the LAA evaluation workflow
 
