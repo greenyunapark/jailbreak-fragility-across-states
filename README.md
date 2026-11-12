@@ -17,29 +17,39 @@ Code and experimental artifacts accompanying:
 </p>
 
 <p align="center">
-  <em>Same model, same jailbreak artifact, different operational state.</em>
+  <em>Same model and attack artifact. Only the ordinary system context changes.</em>
 </p>
 
 ## Overview
 
-Jailbreak robustness is often summarized by a single attack success rate (ASR)
-measured under a default model configuration. Our paper shows that this
-single-point view can be highly unstable: changing only an ordinary system
-prompt can substantially change jailbreak success, even when the target model
-and jailbreak artifact are held fixed.
+Jailbreak robustness is usually evaluated under a default, or **vanilla**,
+model configuration and summarized by a single attack success rate (ASR).
+This implicitly treats robustness as relatively stable for a given
+model–attack pair.
 
-We refer to this phenomenon as **state-induced robustness shift**.
+Our central finding is that this assumption can fail under **ordinary system
+context changes**. Even when the target model, harmful request, and jailbreak
+artifact are all held fixed, changing only a system prompt that was **not
+designed to affect safety** can substantially change whether the same attack
+succeeds.
 
-Across seven aligned language models and three representative jailbreak
-attacks, we find that operational-state variation can strongly affect measured
-robustness. In one setting, ASR changes from **2% to 58%** solely because the
-system prompt changes.
+In other words, jailbreak robustness is **state-contingent**: the surrounding
+operational context can expose or suppress vulnerabilities without changing
+the attack itself. Across seven aligned language models and three
+representative jailbreak attacks, we observe large state-induced robustness
+shifts. In one setting, ASR changes from **2% to 58%** solely because the
+ordinary system prompt changes.
+
+This matters because a single vanilla-state ASR can therefore give an
+incomplete picture of a model's jailbreak robustness. Safety evaluation should
+consider whether robustness persists across the ordinary contexts in which a
+model may actually operate.
 
 The central evaluation protocol is simple:
 
 1. Generate a jailbreak artifact under the **vanilla** operational state.
-2. Keep the target model and jailbreak artifact fixed.
-3. Change only the system prompt used to induce the operational state.
+2. Keep the target model, harmful request, and jailbreak artifact fixed.
+3. Change only the ordinary system prompt used to induce the operational state.
 4. Re-evaluate the same artifact across states.
 5. Compare the resulting ASRs.
 
@@ -51,8 +61,9 @@ representation-level analysis code.
 
 ## Main findings
 
-- Jailbreak robustness is **state-contingent** rather than a fixed property of a
-  model-attack pair.
+- Jailbreak robustness can change substantially under **ordinary,
+  non-safety-oriented system prompts**, even when the model and attack artifact
+  are held fixed.
 - In **18 of 21** model-attack combinations, at least one non-vanilla state
   yields a higher ASR than the vanilla state.
 - State-induced shifts also appear under user-shared role prompts, not only
@@ -142,7 +153,7 @@ representation-level analysis code.
 - Hugging Face access for gated models such as Llama-2
 - an OpenAI API key only when using PAIR generation or GPT-based judging
 
-The Python dependencies are pinned by package family in
+The Python dependencies and tested minimum versions are listed in
 [`requirements.txt`](requirements.txt).
 
 ## Installation
@@ -214,6 +225,14 @@ python attacks/evaluate_operational_states.py \
 This produces responses for **vanilla + the five Big Five states**. The output
 CSV also includes the rule-based diagnostic label, so the generation/evaluation
 pipeline can be checked without an API judge.
+
+> **What is automatically tested?** GitHub Actions installs
+> `requirements.txt`, checks every public CLI entrypoint, verifies that the
+> fixed attack artifact is unchanged across states, and runs the Stage-2
+> evaluation end-to-end with a synthetic target model. The CI does **not**
+> download gated Llama checkpoints or reproduce paper ASRs on a GPU. The
+> one-query command above is the intended real-model smoke test once Hugging
+> Face access and GPU resources are available.
 
 ### 3. Optional: run the paper's GPT judge
 
