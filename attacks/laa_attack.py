@@ -1,5 +1,6 @@
 import sys
-sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 import os
 import csv
@@ -276,7 +277,8 @@ def main(args):
                 print(f"[WARNING] Unicode error while writing row: {e}")
 
 
-if __name__ == "__main__":
+def build_parser():
+    """Build the LAA argument parser used by both the CLI and wrapper scripts."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--attack-max-n-tokens", type=int, default=500)
@@ -290,13 +292,25 @@ if __name__ == "__main__":
     parser.add_argument("--n-chars-change-max", type=int, default=0)
     parser.add_argument("--n-tokens-adv", type=int, default=25)
     parser.add_argument("--n-tokens-change-max", type=int, default=4)
-    parser.add_argument("--schedule_n_to_change", default=True, action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--schedule_n_to_change",
+        default=True,
+        action=argparse.BooleanOptionalAction,
+    )
     parser.add_argument("--schedule_prob", action=argparse.BooleanOptionalAction)
     parser.add_argument("--n-restarts", type=int, default=1)
     parser.add_argument("--target-model", default="llama3-8b")
     parser.add_argument("--target-max-n-tokens", type=int, default=150)
-    parser.add_argument("--judge-model", default="no-judge",
-                        choices=["gpt-3.5-turbo-1106", "gpt-4-0613", "gpt-4-1106-preview", "no-judge"])
+    parser.add_argument(
+        "--judge-model",
+        default="no-judge",
+        choices=[
+            "gpt-3.5-turbo-1106",
+            "gpt-4-0613",
+            "gpt-4-1106-preview",
+            "no-judge",
+        ],
+    )
     parser.add_argument("--judge-max-n-tokens", type=int, default=10)
     parser.add_argument("--judge-temperature", type=float, default=0)
     parser.add_argument("--judge-top-p", type=float, default=1.0)
@@ -304,16 +318,31 @@ if __name__ == "__main__":
     parser.add_argument("--index", type=int, default=0)
     parser.add_argument("--category", type=str, default="bomb")
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--determinstic-jailbreak", action=argparse.BooleanOptionalAction)
+    parser.add_argument(
+        "--determinstic-jailbreak",
+        action=argparse.BooleanOptionalAction,
+    )
     parser.add_argument("--eval-only-rs", action=argparse.BooleanOptionalAction)
     parser.add_argument("--debug", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--safe_prompt", type=str, default="",
-                        help="Safety system prompt. Empty by default (vanilla state).")
-    parser.add_argument("--sys_mode", type=str, default="append",
-                        choices=["append", "prepend", "replace", "default"])
+    parser.add_argument("--persona-prompt", type=str, default="")
+    parser.add_argument("--results-dir", type=str, default="results/laa")
+    parser.add_argument(
+        "--safe_prompt",
+        type=str,
+        default="",
+        help="Safety system prompt. Empty by default (vanilla state).",
+    )
+    parser.add_argument(
+        "--sys_mode",
+        type=str,
+        default="replace",
+        choices=["append", "prepend", "replace", "default"],
+    )
+    return parser
 
-    args = parser.parse_args()
-    main(args)
+
+parser = build_parser()
 
 
-parser = argparse.ArgumentParser()
+if __name__ == "__main__":
+    main(parser.parse_args())
