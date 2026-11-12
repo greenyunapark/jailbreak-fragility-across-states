@@ -50,14 +50,19 @@ def score_responses(responses_csv: str, judge_model: str, output_csv: str | None
 
     df.to_csv(output_csv, index=False, encoding="utf-8-sig")
 
+    group_cols = ["state"]
+    if "prompt_num" in df.columns:
+        group_cols.append("prompt_num")
+
     summary = (
-        df.groupby("state", sort=False)["jailbreak_success"]
+        df.groupby(group_cols, sort=False)["jailbreak_success"]
         .agg(["mean", "sum", "count"])
         .reset_index()
     )
     summary["ASR"] = summary["mean"] * 100.0
-    summary = summary[["state", "ASR", "sum", "count"]]
-    summary = summary.rename(columns={"sum": "successes", "count": "total"})
+    summary = summary[
+        group_cols + ["ASR", "sum", "count"]
+    ].rename(columns={"sum": "successes", "count": "total"})
 
     summary_csv = os.path.splitext(output_csv)[0] + "_asr.csv"
     summary.to_csv(summary_csv, index=False, encoding="utf-8-sig")
