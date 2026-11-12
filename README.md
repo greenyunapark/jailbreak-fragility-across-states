@@ -153,7 +153,7 @@ representation-level analysis code.
 - Hugging Face access for gated models such as Llama-2
 - an OpenAI API key only when using PAIR generation or GPT-based judging
 
-The Python dependencies are pinned by package family in
+The Python dependencies and tested minimum versions are listed in
 [`requirements.txt`](requirements.txt).
 
 ## Installation
@@ -225,6 +225,14 @@ python attacks/evaluate_operational_states.py \
 This produces responses for **vanilla + the five Big Five states**. The output
 CSV also includes the rule-based diagnostic label, so the generation/evaluation
 pipeline can be checked without an API judge.
+
+> **What is automatically tested?** GitHub Actions installs
+> `requirements.txt`, checks every public CLI entrypoint, verifies that the
+> fixed attack artifact is unchanged across states, and runs the Stage-2
+> evaluation end-to-end with a synthetic target model. The CI does **not**
+> download gated Llama checkpoints or reproduce paper ASRs on a GPU. The
+> one-query command above is the intended real-model smoke test once Hugging
+> Face access and GPU resources are available.
 
 ### 3. Optional: run the paper's GPT judge
 
