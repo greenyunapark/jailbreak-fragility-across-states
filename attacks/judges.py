@@ -86,12 +86,6 @@ class GPTJudge(JudgeBase):
         scores = [self.process_output(output['text']) for output in outputs]
         return scores
 
-class OpenSourceJudge(JudgeBase):
-    def __init__(self, judge_model, judge_tokenizer, args):
-        # TODO: Implement open source judge
-        raise NotImplementedError
-
-
 def judge_rule_based(gen_str):
     # from the GCG paper
     test_prefixes = [
