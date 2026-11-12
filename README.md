@@ -107,6 +107,9 @@ analysis code.
 │   ├── filter_paraphrase_candidates.py
 │   └── sample_user_shared_prompts.py
 │
+├── analysis/
+│   └── compute_ssi.py
+│
 ├── intro_figure.pdf
 ├── intro_figure.png
 ├── licenses/
@@ -377,6 +380,22 @@ The pipeline consists of:
 The purpose of this analysis is to characterize a representation-level
 association with state-dependent robustness. It should not be interpreted as
 establishing a causal mechanism.
+
+## State Sensitivity Indicator (SSI)
+
+Section 7 complements ASR with the State Sensitivity Indicator:
+
+```text
+SSI = 1 - 2 * Std(ASR across operational states)
+```
+
+where ASR is represented on a [0, 1] scale and the **population** standard
+deviation is computed across the evaluated states. Given a state-level ASR
+summary from the judge script:
+
+```bash
+python analysis/compute_ssi.py --asr_csv <state-level-asr.csv>
+```
 
 ## Models and attacks evaluated in the paper
 
