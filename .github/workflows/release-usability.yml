@@ -38,3 +38,4 @@ jobs:
           python attacks/pair/evaluate_operational_states.py --help
           python attacks/autodan/prepare_artifacts.py --help
           python attacks/autodan/evaluate_operational_states.py --help
+          python scripts/test_protocol_smoke.py
