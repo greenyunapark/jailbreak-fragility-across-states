@@ -32,7 +32,8 @@ class GPT:
         self.tokenizer.vocab_size = 100256  # note values from 100256 to 100275 (tokenizer.max_token_value) throw an error   
 
     def generate(
-        self, convs: List[List[Dict]], max_n_tokens: int, temperature: float, top_p: float
+        self, convs: List[List[Dict]], max_n_tokens: int, temperature: float,
+        top_p: float, use_logprobs: bool = True
     ):
         """
         Args:
@@ -48,24 +49,36 @@ class GPT:
             output = self.API_ERROR_OUTPUT
             for _ in range(self.API_MAX_RETRY):
                 try:
-                    response = self.client.chat.completions.create(
+                    request_kwargs = dict(
                         model=self.model_name,
                         messages=conv,
                         max_tokens=max_n_tokens,
                         temperature=temperature,
                         top_p=top_p,
                         timeout=self.API_TIMEOUT,
-                        logprobs=self.API_LOGPROBS,
-                        top_logprobs=self.API_TOP_LOGPROBS,
                         seed=0,
                     )
-                    response_logprobs = [
-                        dict((response.choices[0].logprobs.content[i_token].top_logprobs[i_top_logprob].token, 
-                                response.choices[0].logprobs.content[i_token].top_logprobs[i_top_logprob].logprob) 
-                                for i_top_logprob in range(self.API_TOP_LOGPROBS)
+                    if use_logprobs:
+                        request_kwargs.update(
+                            logprobs=self.API_LOGPROBS,
+                            top_logprobs=self.API_TOP_LOGPROBS,
                         )
-                        for i_token in range(len(response.choices[0].logprobs.content))
-                    ]
+                    response = self.client.chat.completions.create(**request_kwargs)
+
+                    response_logprobs = []
+                    if use_logprobs and response.choices[0].logprobs is not None:
+                        response_logprobs = [
+                            dict(
+                                (
+                                    response.choices[0].logprobs.content[i_token]
+                                    .top_logprobs[i_top_logprob].token,
+                                    response.choices[0].logprobs.content[i_token]
+                                    .top_logprobs[i_top_logprob].logprob,
+                                )
+                                for i_top_logprob in range(self.API_TOP_LOGPROBS)
+                            )
+                            for i_token in range(len(response.choices[0].logprobs.content))
+                        ]
                     output = {'text': response.choices[0].message.content,
                             'logprobs': response_logprobs,
                             'n_input_tokens': response.usage.prompt_tokens,
