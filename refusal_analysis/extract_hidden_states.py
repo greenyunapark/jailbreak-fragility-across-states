@@ -1,5 +1,5 @@
 """
-Step 1: Extract hidden states from Llama-2-13B under persona-conditioned prompts.
+Step 1: Extract hidden states under persona-conditioned prompts.
 
 Covers:
   - Original prompts: vanilla + 5 Big Five personas (300 samples)
@@ -7,6 +7,7 @@ Covers:
 
 Usage:
     python extract_hidden_states.py \
+        --target_model  llama2-13b \
         --original_csv  results/laa/llama2-13b_replace_asr.csv \
         --suffix_csv    results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
         --semantic_dir  results_semantic/Llama2-13b \
@@ -157,6 +158,8 @@ def load_semantic_labels(semantic_dir):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--target_model",   type=str, default="llama2-13b",
+                        help="Target model used to extract hidden states (e.g. llama2-13b or llama2-7b).")
     parser.add_argument("--original_csv",    type=str, required=True,
                         help="Judged response CSV for vanilla + Big Five states.")
     parser.add_argument("--suffix_csv",      type=str, required=True,
@@ -198,12 +201,12 @@ def main():
         df_semantic = load_semantic_labels(args.semantic_dir)
 
     class _Args:
-        target_model = "llama2-13b"
+        target_model = args.target_model
         persona_prompt = ""
         sys_mode = args.sys_mode
         safe_prompt = ""
 
-    print("\n[model] Loading llama2-13b...")
+    print(f"\n[model] Loading {args.target_model}...")
     targetLM = load_target_model(_Args())
     print("[model] Loaded.")
 
