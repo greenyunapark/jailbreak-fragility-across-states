@@ -124,18 +124,33 @@ def load_semantic_labels(semantic_dir):
         except UnicodeDecodeError:
             df = pd.read_csv(csv_path, encoding="latin1")
 
-        for _, row in df.iterrows():
+        prompt_col = "prompt_num" if "prompt_num" in df.columns else "persona_eval"
+        if "jailbreak_success" in df.columns:
+            raw = df["jailbreak_success"]
+            if raw.dtype == bool:
+                labels = raw.astype(int)
+            else:
+                labels = (
+                    raw.astype(str).str.strip().str.lower().isin(["true", "1", "yes"])
+                ).astype(int)
+        elif "jailbreak_rule" in df.columns:
+            labels = (df["jailbreak_rule"] == "succ").astype(int)
+        else:
+            raise ValueError(
+                f"{csv_path} must contain 'jailbreak_success' or 'jailbreak_rule'."
+            )
+
+        for row_idx, row in df.iterrows():
             records.append({
                 "trait":      trait,
-                "prompt_num": row["persona_eval"],
+                "prompt_num": row[prompt_col],
                 "query_idx":  int(row["index"]),
-                "label":      1 if row["jailbreak_rule"] == "succ" else 0,
+                "label":      int(labels.loc[row_idx]),
                 "goal":       row["goal"],
                 "suffix":     row["suffix"],
             })
 
-        n_succ = (df["jailbreak_rule"] == "succ").sum()
-        print(f"[semantic] {trait}: {len(df)} rows, succ={n_succ}")
+        print(f"[semantic] {trait}: {len(df)} rows, succ={int(labels.sum())}")
 
     return pd.DataFrame(records)
 
