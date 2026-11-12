@@ -31,25 +31,6 @@ from sklearn.preprocessing import StandardScaler
 from scipy.stats import pearsonr, spearmanr
 
 
-KNOWN_ASR = {
-    "7b": {
-        "vanilla":            2,
-        "Openness":          14,
-        "Conscientiousness": 58,
-        "Extraversion":      16,
-        "Agreeableness":     10,
-        "Neuroticism":       44,
-    },
-    "13b": {
-        "vanilla":            0,
-        "Openness":          46,
-        "Conscientiousness": 14,
-        "Extraversion":      38,
-        "Agreeableness":      8,
-        "Neuroticism":       52,
-    },
-}
-
 PERSONA_ORDER = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
 LAYER_NAMES   = ["early", "middle", "late"]
 LAYER_KEYS    = {"early": "X_early", "middle": "X_middle", "late": "X_late"}
@@ -168,18 +149,27 @@ def main():
     parser.add_argument("--npz_path",      type=str, required=True,
                         help="Path to hidden_vectors.npz from extract_hidden_states.py.")
     parser.add_argument("--output_dir",    type=str, default="probe_results")
-    parser.add_argument("--model",         type=str, default="13b", choices=["7b", "13b"])
     parser.add_argument("--original_only", action="store_true",
                         help="Use only original prompt samples (no paraphrases).")
     args = parser.parse_args()
 
-    known_asr = KNOWN_ASR[args.model]
     os.makedirs(args.output_dir, exist_ok=True)
 
     data      = np.load(args.npz_path, allow_pickle=True)
     personas  = data["personas"]
     y         = data["y"].astype(int)
     query_idx = data["query_idx"]
+
+    if "prompt_nums" in data:
+        original_mask = data["prompt_nums"] == "original"
+    else:
+        original_mask = np.ones(len(y), dtype=bool)
+
+    known_asr = {}
+    for state in ["vanilla"] + PERSONA_ORDER:
+        state_mask = original_mask & (personas == state)
+        if state_mask.sum() > 0:
+            known_asr[state] = float(y[state_mask].mean() * 100.0)
 
     if args.original_only and "prompt_nums" in data:
         mask      = data["prompt_nums"] == "original"
