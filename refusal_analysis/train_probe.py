@@ -30,6 +30,7 @@ from scipy.stats import pearsonr, spearmanr
 
 
 PERSONA_ORDER = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
+STATE_ORDER   = ["vanilla"] + PERSONA_ORDER
 LAYER_NAMES   = ["early", "middle", "late"]
 LAYER_KEYS    = {"early": "X_early", "middle": "X_middle", "late": "X_late"}
 
@@ -52,21 +53,30 @@ def train_probe(X, y, layer_name, cv=5):
 def compute_projections(X_by_persona, probe, scaler):
     direction = probe.coef_[0]
     direction = direction / (np.linalg.norm(direction) + 1e-8)
-    proj_mean, proj_std = {}, {}
+    proj_mean, proj_std, proj_se, proj_n = {}, {}, {}, {}
     for persona, X in X_by_persona.items():
+        if len(X) == 0:
+            continue
         projs = scaler.transform(X) @ direction
-        proj_mean[persona] = projs.mean()
-        proj_std[persona] = projs.std()
-    return proj_mean, proj_std, direction
+        proj_mean[persona] = float(projs.mean())
+        proj_std[persona] = float(projs.std(ddof=0))
+        proj_n[persona] = int(len(projs))
+        proj_se[persona] = float(proj_std[persona] / np.sqrt(proj_n[persona]))
+    return proj_mean, proj_std, proj_se, proj_n, direction
 
 
 def compute_correlation_table(probe_results, known_asr):
-    print("\n-- Projection vs ASR Correlation --")
+    print("\n-- Projection vs ASR Correlation (vanilla + Big Five) --")
     rows = []
     for layer in LAYER_NAMES:
         proj_mean = probe_results[layer]["proj_mean"]
-        xs = [proj_mean.get(p, 0) for p in PERSONA_ORDER]
-        ys = [known_asr.get(p, 0) for p in PERSONA_ORDER]
+        states = [s for s in STATE_ORDER if s in proj_mean and s in known_asr]
+        xs = [proj_mean[s] for s in states]
+        ys = [known_asr[s] for s in states]
+        if len(states) < 3:
+            raise ValueError(
+                f"Need at least 3 operational states for correlation; got {states}"
+            )
         r_p, p_p = pearsonr(xs, ys)
         r_s, p_s = spearmanr(xs, ys)
         sig = "**" if p_p < 0.05 else ("*" if p_p < 0.1 else "")
@@ -105,18 +115,18 @@ def plot_results(probe_results, known_asr, output_dir):
     ax = axes[1]
     for layer in LAYER_NAMES:
         proj_mean = probe_results[layer]["proj_mean"]
-        proj_std  = probe_results[layer]["proj_std"]
-        xs = [proj_mean.get(p, 0) for p in PERSONA_ORDER]
-        ys = [known_asr.get(p, 0) for p in PERSONA_ORDER]
-        es = [proj_std.get(p, 0) for p in PERSONA_ORDER]
+        proj_se = probe_results[layer]["proj_se"]
+        states = [s for s in STATE_ORDER if s in proj_mean and s in known_asr]
+        xs = [proj_mean[s] for s in states]
+        ys = [known_asr[s] for s in states]
+        es = [proj_se[s] for s in states]
         ax.errorbar(xs, ys, xerr=es, fmt="o", color=layer_colors[layer],
                     ms=8, label=layer, capsize=3, zorder=5,
                     elinewidth=1, markeredgecolor="white")
-        for p, xi, yi in zip(PERSONA_ORDER, xs, ys):
-            ax.annotate(p[:3], (xi, yi), textcoords="offset points",
+        for state, xi, yi in zip(states, xs, ys):
+            label = "V" if state == "vanilla" else state[0]
+            ax.annotate(label, (xi, yi), textcoords="offset points",
                         xytext=(5, 3), fontsize=9)
-    ax.axhline(known_asr["vanilla"], color="gray", linestyle="--", lw=0.8,
-               label=f"vanilla ASR={known_asr['vanilla']}%")
     ax.set_xlabel("Projection onto Refusal Direction", fontsize=12)
     ax.set_ylabel("ASR (%)", fontsize=12)
     ax.set_title("(b) Refusal Direction Projection vs ASR", fontsize=13)
@@ -194,14 +204,16 @@ def main():
         probe, scaler, cv_scores = train_probe(X_all, y, layer)
 
         X_by_persona = {p: X_all[personas == p] for p in np.unique(personas)}
-        proj_mean, proj_std, direction = compute_projections(X_by_persona, probe, scaler)
+        proj_mean, proj_std, proj_se, proj_n, direction = compute_projections(
+            X_by_persona, probe, scaler
+        )
 
         print(f"\n  Projection onto refusal direction:")
         for p in ["vanilla"] + PERSONA_ORDER:
             m   = proj_mean.get(p, 0)
-            s   = proj_std.get(p, 0)
+            se  = proj_se.get(p, 0)
             asr = known_asr.get(p, "?")
-            print(f"    {p:20s}: {m:+.4f} +/- {s:.4f}  (ASR={asr}%)")
+            print(f"    {p:20s}: {m:+.4f} +/- {se:.4f} SE  (ASR={asr}%)")
 
         probe_results[layer] = {
             "probe":    probe,
@@ -210,8 +222,29 @@ def main():
             "cv_std":   cv_scores.std(),
             "proj_mean": proj_mean,
             "proj_std":  proj_std,
+            "proj_se":   proj_se,
+            "proj_n":    proj_n,
             "direction": direction,
         }
+
+    # Save state-level projection statistics used for projection-ASR analysis.
+    summary_rows = []
+    for layer in LAYER_NAMES:
+        for state in STATE_ORDER:
+            if state not in probe_results[layer]["proj_mean"] or state not in known_asr:
+                continue
+            summary_rows.append({
+                "layer": layer,
+                "state": state,
+                "projection_mean": probe_results[layer]["proj_mean"][state],
+                "projection_se": probe_results[layer]["proj_se"][state],
+                "n": probe_results[layer]["proj_n"][state],
+                "ASR": known_asr[state],
+            })
+    state_summary = pd.DataFrame(summary_rows)
+    state_summary_path = os.path.join(args.output_dir, "probe_state_summary.csv")
+    state_summary.to_csv(state_summary_path, index=False, encoding="utf-8-sig")
+    print(f"\n[save] {state_summary_path}")
 
     df_corr = compute_correlation_table(probe_results, known_asr)
     corr_path = os.path.join(args.output_dir, "probe_correlation.csv")
