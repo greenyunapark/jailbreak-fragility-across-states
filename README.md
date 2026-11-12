@@ -116,6 +116,7 @@ analysis code.
 │   ├── LAA_LICENSE
 │   └── ADVBENCH_LICENSE
 ├── requirements.txt
+├── LICENSE
 ├── .env.example
 ├── THIRD_PARTY_NOTICES.md
 ├── .gitignore
@@ -468,6 +469,16 @@ contains code partially based on PAIR. Our modifications add support for the
 operational-state evaluation protocol used in this work.
 
 See `THIRD_PARTY_NOTICES.md` for attribution details.
+
+## License
+
+The repository's original code is released under the **MIT License**. See
+[`LICENSE`](LICENSE).
+
+Third-party materials retain their original licenses and attribution terms.
+In particular, the adapted LAA implementation and AdvBench-derived data are
+covered by their preserved MIT notices under [`licenses/`](licenses/) and
+documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
