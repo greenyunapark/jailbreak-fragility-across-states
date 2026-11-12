@@ -77,9 +77,10 @@ class TargetLM:
                 prompt = f"{sys_prefix}{system_text}{sys_suffix}" if system_text else prompt
 
             elif "llama2" in self.model_name:
-                SYS_START = "<s>[INST] <<SYS>>\n"
-                SYS_END = "\n<</SYS>>\n\n"
-                conv.system = f"{SYS_START}{system_text}{SYS_END}" if system_text else ""
+                # FastChat's llama-2 template wraps system_message with
+                # [INST] <<SYS>> ... <</SYS>>. Set only the message content
+                # here to avoid double-wrapping or silently ignored fields.
+                conv.system_message = system_text
                 prompt = prompt + " "
 
             elif any(m in self.model_name for m in ["llama3", "phi3", "vicuna", "qwen2.5", "r2d2"]):
@@ -205,9 +206,7 @@ class TargetLM:
 
         full_prompts = []
         for conv, prompt in zip(convs_list, prompts_list):
-            SYS_START = "<s>[INST] <<SYS>>\n"
-            SYS_END = "\n<</SYS>>\n\n"
-            conv.system = f"{SYS_START}{system_text}{SYS_END}" if system_text else ""
+            conv.system_message = system_text
             prompt = prompt + " "
             conv.append_message(conv.roles[0], prompt)
             conv.append_message(conv.roles[1], None)
