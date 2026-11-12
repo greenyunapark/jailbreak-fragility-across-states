@@ -20,3 +20,7 @@ states.
 
 The original LAA repository is itself partially based on the PAIR repository:
 https://github.com/patrickrchao/JailbreakingLLMs
+
+
+The upstream MIT license text is preserved in
+[`licenses/LAA_LICENSE`](licenses/LAA_LICENSE).
