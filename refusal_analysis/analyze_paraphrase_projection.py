@@ -105,9 +105,12 @@ def main():
               f"range=[{sub['proj_mean'].min():+.2f}, {sub['proj_mean'].max():+.2f}]  "
               f"ASR mean={sub['asr'].mean():.1f}%")
 
-    groups = [df[df["trait"] == t]["proj_mean"].values for t in TRAITS]
-    f_stat, p_anova = f_oneway(*groups)
-    print(f"\n  ANOVA (across traits): F={f_stat:.3f}, p={p_anova:.3f}")
+    projection_groups = [df[df["trait"] == t]["proj_mean"].values for t in TRAITS]
+    f_proj, p_proj = f_oneway(*projection_groups)
+    print(
+        f"\n  Projection ANOVA across traits (paraphrases only): "
+        f"F={f_proj:.3f}, p={p_proj:.3g}"
+    )
 
     trait_means = df.groupby("trait")["proj_mean"].mean()
     original_asr = {}
@@ -119,6 +122,50 @@ def main():
     missing = [t for t in trait_means.index if t not in original_asr]
     if missing:
         raise ValueError(f"Missing original-prompt labels for: {missing}")
+
+    # Section 6.1 ANOVA: original prompt + 10 retained paraphrases per trait.
+    # This yields 55 prompt-level ASR observations and df=(4, 50).
+    asr_groups = []
+    for trait in TRAITS:
+        paraphrase_asr = df[df["trait"] == trait]["asr"].to_numpy(dtype=float)
+        asr_groups.append(np.concatenate(([original_asr[trait]], paraphrase_asr)))
+
+    f_asr, p_asr = f_oneway(*asr_groups)
+    all_asr = np.concatenate(asr_groups)
+    grand_mean = all_asr.mean()
+    ss_between = sum(
+        len(group) * (group.mean() - grand_mean) ** 2 for group in asr_groups
+    )
+    ss_total = ((all_asr - grand_mean) ** 2).sum()
+    eta_sq = ss_between / ss_total if ss_total > 0 else np.nan
+    df_between = len(TRAITS) - 1
+    df_within = len(all_asr) - len(TRAITS)
+    print(
+        f"\n  ASR ANOVA (original + 10 paraphrases per trait): "
+        f"F({df_between}, {df_within})={f_asr:.3f}, "
+        f"p={p_asr:.3g}, eta^2={eta_sq:.3f}"
+    )
+
+    stats_path = os.path.join(args.output_dir, "paraphrase_statistics.csv")
+    pd.DataFrame([
+        {
+            "analysis": "projection_anova_paraphrases",
+            "F": f_proj,
+            "df_between": len(TRAITS) - 1,
+            "df_within": len(df) - len(TRAITS),
+            "p": p_proj,
+            "eta_squared": np.nan,
+        },
+        {
+            "analysis": "asr_anova_original_plus_paraphrases",
+            "F": f_asr,
+            "df_between": df_between,
+            "df_within": df_within,
+            "p": p_asr,
+            "eta_squared": eta_sq,
+        },
+    ]).to_csv(stats_path, index=False)
+    print(f"[save] {stats_path}")
 
     asr_vals = [original_asr[t] for t in trait_means.index]
     r_p, p_p    = pearsonr(trait_means.values, asr_vals)
