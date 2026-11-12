@@ -5,14 +5,12 @@ projections onto the refusal direction.
 Usage:
     python train_probe.py \
         --npz_path    probe_data/hidden_vectors.npz \
-        --output_dir  probe_results \
-        --model       13b
+        --output_dir  probe_results
 
     # Original prompts only (no paraphrases):
     python train_probe.py \
         --npz_path    probe_data/hidden_vectors.npz \
         --output_dir  probe_results \
-        --model       13b \
         --original_only
 """
 
