@@ -1,5 +1,5 @@
 """
-Step 1: Extract hidden states from Llama-2-13B under persona-conditioned prompts.
+Step 1: Extract hidden states under persona-conditioned prompts.
 
 Covers:
   - Original prompts: vanilla + 5 Big Five personas (300 samples)
@@ -7,17 +7,25 @@ Covers:
 
 Usage:
     python extract_hidden_states.py \
+        --target_model  llama2-13b \
         --original_csv  results/laa/llama2-13b_replace_asr.csv \
+        --suffix_csv    results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
         --semantic_dir  results_semantic/Llama2-13b \
-        --dataset       advbench \
         --sys_mode      replace \
         --output_dir    probe_data
 """
 
 import os
+import sys
 import argparse
 import glob
 import traceback
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ATTACKS_DIR = ROOT / "attacks"
+if str(ATTACKS_DIR) not in sys.path:
+    sys.path.insert(0, str(ATTACKS_DIR))
 
 import numpy as np
 import pandas as pd
@@ -48,41 +56,11 @@ semantic_prompts = {
 
 
 def _build_full_prompts(targetLM, prompts_list, persona_prompt):
+    """Reuse the target-model prompt construction used by the attack pipeline."""
     import common
-    batchsize = len(prompts_list)
-    tokenizer = targetLM.model.tokenizer
-    convs_list = [common.conv_template(targetLM.template) for _ in range(batchsize)]
-    has_persona = bool(persona_prompt and persona_prompt.strip())
-    model_name = targetLM.model_name
-    sys_mode = targetLM.sys_mode
-    full_prompts = []
 
-    for conv, prompt in zip(convs_list, prompts_list):
-        if "llama2" in model_name:
-            from model_loader import get_system_message
-            cur = get_system_message(conv)
-            S, E = "<s>[INST] <<SYS>>\n", "\n<</SYS>>\n\n"
-            default = cur.replace(S, "").replace(E, "").strip()
-            if not has_persona:
-                new_sys = f"{S}{default}{E}" if sys_mode in ("append", "prepend") else f"{S}{persona_prompt}{E}"
-            elif sys_mode == "append":
-                new_sys = f"{S}{default}\n\n{persona_prompt}{E}"
-            elif sys_mode == "prepend":
-                new_sys = f"{S}{persona_prompt}\n\n{default}{E}"
-            else:
-                new_sys = f"{S}{persona_prompt}{E}"
-            conv.system = new_sys
-            prompt = prompt + " "
-
-        conv.append_message(conv.roles[0], prompt)
-
-        if "llama2" in model_name:
-            conv.append_message(conv.roles[1], None)
-            full_prompts.append("<s>" + conv.get_prompt())
-        else:
-            raise ValueError(f"Model {model_name} not supported for hidden state extraction.")
-
-    return full_prompts
+    convs_list = [common.conv_template(targetLM.template) for _ in prompts_list]
+    return targetLM._build_full_prompts(prompts_list, persona_prompt, convs_list)
 
 
 @torch.no_grad()
@@ -106,10 +84,28 @@ def load_original_labels(original_csv):
         df = pd.read_csv(original_csv, encoding="utf-8-sig")
     except UnicodeDecodeError:
         df = pd.read_csv(original_csv, encoding="latin1")
-    df["persona_norm"] = df["persona_eval"].replace({"pure": "vanilla"})
+
+    state_col = "state" if "state" in df.columns else "persona_eval"
+    df["persona_norm"] = df[state_col].replace({"pure": "vanilla"})
+
+    if "jailbreak_success" in df.columns:
+        raw = df["jailbreak_success"]
+        if raw.dtype == bool:
+            df["label"] = raw.astype(int)
+        else:
+            df["label"] = (
+                raw.astype(str).str.strip().str.lower().isin(["true", "1", "yes"])
+            ).astype(int)
+    elif "jailbreak_rule" in df.columns:
+        df["label"] = (df["jailbreak_rule"] == "succ").astype(int)
+    else:
+        raise ValueError(
+            "original_csv must contain either 'jailbreak_success' "
+            "(preferred, GPT-4 judged) or 'jailbreak_rule'."
+        )
+
     print(f"[original] {len(df)} rows loaded.")
-    print(df.groupby("persona_norm")["jailbreak_rule"]
-          .apply(lambda s: (s == "succ").sum()).rename("n_succ"))
+    print(df.groupby("persona_norm")["label"].sum().rename("n_succ"))
     return df
 
 
@@ -129,29 +125,47 @@ def load_semantic_labels(semantic_dir):
         except UnicodeDecodeError:
             df = pd.read_csv(csv_path, encoding="latin1")
 
-        for _, row in df.iterrows():
+        prompt_col = "prompt_num" if "prompt_num" in df.columns else "persona_eval"
+        if "jailbreak_success" in df.columns:
+            raw = df["jailbreak_success"]
+            if raw.dtype == bool:
+                labels = raw.astype(int)
+            else:
+                labels = (
+                    raw.astype(str).str.strip().str.lower().isin(["true", "1", "yes"])
+                ).astype(int)
+        elif "jailbreak_rule" in df.columns:
+            labels = (df["jailbreak_rule"] == "succ").astype(int)
+        else:
+            raise ValueError(
+                f"{csv_path} must contain 'jailbreak_success' or 'jailbreak_rule'."
+            )
+
+        for row_idx, row in df.iterrows():
             records.append({
                 "trait":      trait,
-                "prompt_num": row["persona_eval"],
+                "prompt_num": row[prompt_col],
                 "query_idx":  int(row["index"]),
-                "label":      1 if row["jailbreak_rule"] == "succ" else 0,
+                "label":      int(labels.loc[row_idx]),
                 "goal":       row["goal"],
                 "suffix":     row["suffix"],
             })
 
-        n_succ = (df["jailbreak_rule"] == "succ").sum()
-        print(f"[semantic] {trait}: {len(df)} rows, succ={n_succ}")
+        print(f"[semantic] {trait}: {len(df)} rows, succ={int(labels.sum())}")
 
     return pd.DataFrame(records)
 
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--target_model",   type=str, default="llama2-13b",
+                        help="Target model used to extract hidden states (e.g. llama2-13b or llama2-7b).")
     parser.add_argument("--original_csv",    type=str, required=True,
-                        help="Path to ASR results CSV for original prompts.")
-    parser.add_argument("--semantic_dir",    type=str, required=True,
-                        help="Directory containing paraphrase results (e.g. results_semantic/Llama2-13b).")
-    parser.add_argument("--dataset",         type=str, required=True)
+                        help="Judged response CSV for vanilla + Big Five states.")
+    parser.add_argument("--suffix_csv",      type=str, required=True,
+                        help="Stage-1 fixed-suffix CSV produced by generate_suffixes.py.")
+    parser.add_argument("--semantic_dir",    type=str, default=None,
+                        help="Directory containing paraphrase results. Required unless --skip_semantic is set.")
     parser.add_argument("--sys_mode",        type=str, default="replace")
     parser.add_argument("--output_dir",      type=str, default="probe_data")
     parser.add_argument("--prompt_template", type=str, default="best_llama2")
@@ -169,7 +183,7 @@ def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
-    suffix_csv = f"pure_suffix/{args.dataset}/llama2-13b_replace.csv"
+    suffix_csv = args.suffix_csv
     try:
         df_src = pd.read_csv(suffix_csv, encoding="utf-8-sig")
     except UnicodeDecodeError:
@@ -179,15 +193,20 @@ def main():
     print(f"[suffix] {len(queries)} queries loaded.")
 
     df_original = load_original_labels(args.original_csv)
-    df_semantic = load_semantic_labels(args.semantic_dir)
+    if args.skip_semantic:
+        df_semantic = pd.DataFrame()
+    else:
+        if not args.semantic_dir:
+            raise ValueError("--semantic_dir is required unless --skip_semantic is set.")
+        df_semantic = load_semantic_labels(args.semantic_dir)
 
     class _Args:
-        target_model = "llama2-13b"
+        target_model = args.target_model
         persona_prompt = ""
         sys_mode = args.sys_mode
         safe_prompt = ""
 
-    print("\n[model] Loading llama2-13b...")
+    print(f"\n[model] Loading {args.target_model}...")
     targetLM = load_target_model(_Args())
     print("[model] Loaded.")
 
@@ -212,7 +231,7 @@ def main():
                     row = rows[rows["index"] == q_idx]
                     if len(row) == 0:
                         continue
-                    label = 1 if row.iloc[0]["jailbreak_rule"] == "succ" else 0
+                    label = int(row.iloc[0]["label"])
 
                     base_prompt = get_universal_manual_prompt_sys(
                         args.prompt_template, "", goal.lower()

@@ -22,7 +22,10 @@ class GPT:
     def __init__(self, model_name):
         self.model_name = model_name
         if 'gpt' in model_name:
-            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY is required for GPT API models.")
+            self.client = OpenAI(api_key=api_key)
         elif 'together' in model_name:
             TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
             self.client = OpenAI(api_key=TOGETHER_API_KEY, base_url='https://api.together.xyz')
@@ -32,7 +35,8 @@ class GPT:
         self.tokenizer.vocab_size = 100256  # note values from 100256 to 100275 (tokenizer.max_token_value) throw an error   
 
     def generate(
-        self, convs: List[List[Dict]], max_n_tokens: int, temperature: float, top_p: float
+        self, convs: List[List[Dict]], max_n_tokens: int, temperature: float,
+        top_p: float, use_logprobs: bool = True
     ):
         """
         Args:
@@ -45,27 +49,44 @@ class GPT:
         """
         outputs = []
         for conv in convs:
-            output = self.API_ERROR_OUTPUT
+            output = {
+                "text": self.API_ERROR_OUTPUT,
+                "logprobs": [],
+                "n_input_tokens": 0,
+                "n_output_tokens": 0,
+            }
             for _ in range(self.API_MAX_RETRY):
                 try:
-                    response = self.client.chat.completions.create(
+                    request_kwargs = dict(
                         model=self.model_name,
                         messages=conv,
                         max_tokens=max_n_tokens,
                         temperature=temperature,
                         top_p=top_p,
                         timeout=self.API_TIMEOUT,
-                        logprobs=self.API_LOGPROBS,
-                        top_logprobs=self.API_TOP_LOGPROBS,
                         seed=0,
                     )
-                    response_logprobs = [
-                        dict((response.choices[0].logprobs.content[i_token].top_logprobs[i_top_logprob].token, 
-                                response.choices[0].logprobs.content[i_token].top_logprobs[i_top_logprob].logprob) 
-                                for i_top_logprob in range(self.API_TOP_LOGPROBS)
+                    if use_logprobs:
+                        request_kwargs.update(
+                            logprobs=self.API_LOGPROBS,
+                            top_logprobs=self.API_TOP_LOGPROBS,
                         )
-                        for i_token in range(len(response.choices[0].logprobs.content))
-                    ]
+                    response = self.client.chat.completions.create(**request_kwargs)
+
+                    response_logprobs = []
+                    if use_logprobs and response.choices[0].logprobs is not None:
+                        response_logprobs = [
+                            dict(
+                                (
+                                    response.choices[0].logprobs.content[i_token]
+                                    .top_logprobs[i_top_logprob].token,
+                                    response.choices[0].logprobs.content[i_token]
+                                    .top_logprobs[i_top_logprob].logprob,
+                                )
+                                for i_top_logprob in range(self.API_TOP_LOGPROBS)
+                            )
+                            for i_token in range(len(response.choices[0].logprobs.content))
+                        ]
                     output = {'text': response.choices[0].message.content,
                             'logprobs': response_logprobs,
                             'n_input_tokens': response.usage.prompt_tokens,

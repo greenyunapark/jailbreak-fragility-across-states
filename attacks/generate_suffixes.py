@@ -3,16 +3,16 @@ Stage 1: Generate optimized suffixes under the vanilla state.
 
 Usage:
     # Default (empty system prompt):
-    python generate_suffixes.py \
+    python attacks/generate_suffixes.py \
         --target_model llama2-7b \
-        --csv_path advbench_50.csv \
+        --csv_path datasets/advbench_50.csv \
         --sys_mode replace \
         --results_dir results/laa
 
     # With safety system prompt:
-    python generate_suffixes.py \
+    python attacks/generate_suffixes.py \
         --target_model llama2-7b \
-        --csv_path advbench_50.csv \
+        --csv_path datasets/advbench_50.csv \
         --sys_mode replace \
         --safe_prompt "$(python -c 'from config import SAFE_PROMPT; print(SAFE_PROMPT)')"
 """
@@ -33,7 +33,7 @@ from judges import judge_rule_based
 parser = argparse.ArgumentParser()
 parser.add_argument("--target_model", type=str, required=True,
                     help="e.g. llama2-7b, llama2-13b, llama3-8b, qwen2.5-7b")
-parser.add_argument("--csv_path", type=str, default="advbench_50.csv")
+parser.add_argument("--csv_path", type=str, default="datasets/advbench_50.csv")
 parser.add_argument("--results_dir", type=str, default="results/laa")
 parser.add_argument("--sys_mode", type=str, default="replace",
                     choices=["append", "prepend", "replace"],
@@ -117,6 +117,7 @@ def run_with_personality(csv_path, target_model_name, results_dir_base, sys_mode
         args_template.judge_model = "no-judge"
         args_template.determinstic_jailbreak = False
         args_template.n_iterations = 5
+        args_template.n_chars_adv = 100
         args_template.n_tokens_adv = 25
         args_template.n_tokens_change_max = 4
         args_template.prompt_template = "best_llama2"
@@ -186,6 +187,6 @@ if __name__ == "__main__":
         args.target_model,
         args.results_dir,
         args.sys_mode,
-        safe_prompt=args.safe_prompt,
         args.n_restarts,
+        safe_prompt=args.safe_prompt,
     )

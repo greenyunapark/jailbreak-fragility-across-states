@@ -22,15 +22,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr, f_oneway
 
 
-KNOWN_ASR_13B = {
-    "vanilla":            0,
-    "Openness":          46,
-    "Conscientiousness": 14,
-    "Extraversion":      38,
-    "Agreeableness":      8,
-    "Neuroticism":       52,
-}
-
 TRAITS = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
 LAYER_KEYS = {"early": "X_early", "middle": "X_middle", "late": "X_late"}
 TRAIT_COLORS = {
@@ -79,10 +70,16 @@ def main():
 
     records = []
     for trait in TRAITS:
-        for pnum in [f"prompt{i}" for i in range(1, 11)]:
+        available_prompts = sorted(
+            {
+                str(p)
+                for p in prompt_nums[personas == trait]
+                if str(p) != "original"
+            },
+            key=lambda x: int(x.replace("prompt", "")) if x.startswith("prompt") else x,
+        )
+        for pnum in available_prompts:
             mask = (personas == trait) & (prompt_nums == pnum)
-            if mask.sum() == 0:
-                continue
             projs = project(X_all[mask], direction, scaler_mean, scaler_scale)
             n_succ = y[mask].sum()
             asr = n_succ / mask.sum() * 100
@@ -108,12 +105,69 @@ def main():
               f"range=[{sub['proj_mean'].min():+.2f}, {sub['proj_mean'].max():+.2f}]  "
               f"ASR mean={sub['asr'].mean():.1f}%")
 
-    groups = [df[df["trait"] == t]["proj_mean"].values for t in TRAITS]
-    f_stat, p_anova = f_oneway(*groups)
-    print(f"\n  ANOVA (across traits): F={f_stat:.3f}, p={p_anova:.3f}")
+    projection_groups = [df[df["trait"] == t]["proj_mean"].values for t in TRAITS]
+    f_proj, p_proj = f_oneway(*projection_groups)
+    print(
+        f"\n  Projection ANOVA across traits (paraphrases only): "
+        f"F={f_proj:.3f}, p={p_proj:.3g}"
+    )
 
     trait_means = df.groupby("trait")["proj_mean"].mean()
-    asr_vals    = [KNOWN_ASR_13B[t] for t in trait_means.index]
+    original_asr = {}
+    for trait in TRAITS:
+        mask = (personas == trait) & (prompt_nums == "original")
+        if mask.sum() > 0:
+            original_asr[trait] = float(y[mask].mean() * 100.0)
+
+    missing = [t for t in trait_means.index if t not in original_asr]
+    if missing:
+        raise ValueError(f"Missing original-prompt labels for: {missing}")
+
+    # Section 6.1 ANOVA: original prompt + 10 retained paraphrases per trait.
+    # This yields 55 prompt-level ASR observations and df=(4, 50).
+    asr_groups = []
+    for trait in TRAITS:
+        paraphrase_asr = df[df["trait"] == trait]["asr"].to_numpy(dtype=float)
+        asr_groups.append(np.concatenate(([original_asr[trait]], paraphrase_asr)))
+
+    f_asr, p_asr = f_oneway(*asr_groups)
+    all_asr = np.concatenate(asr_groups)
+    grand_mean = all_asr.mean()
+    ss_between = sum(
+        len(group) * (group.mean() - grand_mean) ** 2 for group in asr_groups
+    )
+    ss_total = ((all_asr - grand_mean) ** 2).sum()
+    eta_sq = ss_between / ss_total if ss_total > 0 else np.nan
+    df_between = len(TRAITS) - 1
+    df_within = len(all_asr) - len(TRAITS)
+    print(
+        f"\n  ASR ANOVA (original + 10 paraphrases per trait): "
+        f"F({df_between}, {df_within})={f_asr:.3f}, "
+        f"p={p_asr:.3g}, eta^2={eta_sq:.3f}"
+    )
+
+    stats_path = os.path.join(args.output_dir, "paraphrase_statistics.csv")
+    pd.DataFrame([
+        {
+            "analysis": "projection_anova_paraphrases",
+            "F": f_proj,
+            "df_between": len(TRAITS) - 1,
+            "df_within": len(df) - len(TRAITS),
+            "p": p_proj,
+            "eta_squared": np.nan,
+        },
+        {
+            "analysis": "asr_anova_original_plus_paraphrases",
+            "F": f_asr,
+            "df_between": df_between,
+            "df_within": df_within,
+            "p": p_asr,
+            "eta_squared": eta_sq,
+        },
+    ]).to_csv(stats_path, index=False)
+    print(f"[save] {stats_path}")
+
+    asr_vals = [original_asr[t] for t in trait_means.index]
     r_p, p_p    = pearsonr(trait_means.values, asr_vals)
     r_s, p_s    = spearmanr(trait_means.values, asr_vals)
     print(f"\n  Trait mean projection vs ASR:")
@@ -146,7 +200,7 @@ def main():
     ax.legend(fontsize=9)
 
     ax2 = ax.twinx()
-    ax2.plot(positions, [KNOWN_ASR_13B[t] for t in TRAITS],
+    ax2.plot(positions, [original_asr[t] for t in TRAITS],
              "D--", color="crimson", lw=1.5, ms=7, label="ASR (%)")
     ax2.set_ylabel("ASR (%)", color="crimson", fontsize=12)
     ax2.tick_params(axis="y", labelcolor="crimson")
@@ -159,7 +213,7 @@ def main():
                    label=trait[:3], zorder=5)
     for trait in TRAITS:
         sub = df[df["trait"] == trait]
-        ax.scatter(sub["proj_mean"].mean(), KNOWN_ASR_13B[trait],
+        ax.scatter(sub["proj_mean"].mean(), original_asr[trait],
                    color=TRAIT_COLORS[trait], s=150, marker="D",
                    edgecolors="black", lw=1.5, zorder=6)
 

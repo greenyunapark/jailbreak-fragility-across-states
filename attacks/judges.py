@@ -1,6 +1,3 @@
-from fastchat.model import (
-    get_conversation_template
-)
 import re
 from prompts import get_judge_system_prompt
 
@@ -60,10 +57,10 @@ class GPTJudge(JudgeBase):
         self.judge_model = GPT(model_name = self.judge_name)
 
     def create_conv(self, full_prompt):
-        conv = get_conversation_template(self.judge_name)
-        conv.set_system_message(self.system_prompt)
-        conv.append_message(conv.roles[0], full_prompt)
-        return conv.to_openai_api_messages()
+        return [
+            {"role": "system", "content": self.system_prompt},
+            {"role": "user", "content": full_prompt},
+        ]
 
     def score(self, prompts, responses):
         assert isinstance(prompts, list), "prompts should be a list"
@@ -75,19 +72,19 @@ class GPTJudge(JudgeBase):
 
 
         convs = [self.create_conv(self.get_judge_prompt(prompt, response)) for prompt, response in zip(prompts, responses)]
-        outputs = self.judge_model.generate(convs, max_n_tokens=self.max_n_tokens, temperature=self.temperature, top_p=self.top_p)
+        outputs = self.judge_model.generate(
+            convs,
+            max_n_tokens=self.max_n_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            use_logprobs=False,
+        )
 
 
         for o in outputs:
             print("RAW JUDGE OUTPUT:", repr(o['text']))
         scores = [self.process_output(output['text']) for output in outputs]
         return scores
-
-class OpenSourceJudge(JudgeBase):
-    def __init__(self, judge_model, judge_tokenizer, args):
-        # TODO: Implement open source judge
-        raise NotImplementedError
-
 
 def judge_rule_based(gen_str):
     # from the GCG paper

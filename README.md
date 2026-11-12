@@ -1,165 +1,421 @@
 # The Fragility of Jailbreak Robustness Across Operational States
 
-Official code and experimental artifacts for:
+Code and experimental artifacts accompanying:
 
 **The Fragility of Jailbreak Robustness Across Operational States**  
-*Findings of EMNLP 2026*
+*Findings of the Association for Computational Linguistics: EMNLP 2026*
 
 **Yuna Park, Hwang Youn Kim, Yujin Kim, Won Woo Ro, Suhyun Kim, Jae-In Hwang**
 
-[📄 arXiv](https://arxiv.org/abs/2608.30748)
-
----
+[ACL Anthology](https://aclanthology.org/2026.findings-emnlp.1840/) · [arXiv](https://arxiv.org/abs/2608.30748)
 
 <p align="center">
   <a href="intro_figure.pdf">
     <img src="intro_figure.png" width="900"
-         alt="Illustration of state-induced robustness shift">
+         alt="Illustration of state-induced jailbreak robustness shifts">
   </a>
 </p>
 
-
+<p align="center">
+  <em>Same model, same jailbreak artifact, different operational state.</em>
+</p>
 
 ## Overview
 
-Jailbreak robustness is commonly characterized using a single attack success
-rate (ASR) measured under a default, or *vanilla*, model configuration.
+Jailbreak robustness is often summarized by a single attack success rate (ASR)
+measured under a default model configuration. Our paper shows that this
+single-point view can be highly unstable: changing only an ordinary system
+prompt can substantially change jailbreak success, even when the target model
+and jailbreak artifact are held fixed.
 
-In this work, we show that jailbreak robustness can vary substantially when
-only the model's **context-induced operational state** is changed, while the
-target model and jailbreak artifact remain fixed. We refer to this phenomenon
-as **state-induced robustness shift**.
+We refer to this phenomenon as **state-induced robustness shift**.
 
-We systematically study this phenomenon across seven aligned language models
-and three representative jailbreak attacks. In some settings, changing only
-the operational state changes ASR by as much as **56 percentage points
-(2% → 58%)**, without modifying the jailbreak artifact itself.
+Across seven aligned language models and three representative jailbreak
+attacks, we find that operational-state variation can strongly affect measured
+robustness. In one setting, ASR changes from **2% to 58%** solely because the
+system prompt changes.
 
-We further show that state-dependent robustness variation is systematically
-associated with differences in hidden representations along a
-**refusal-related axis**, providing a predictive representation-level account
-of the observed robustness shifts.
+The central evaluation protocol is simple:
 
-This repository provides the code and experimental artifacts associated with
-our study, including operational-state prompts, LAA-based evaluation code,
-and refusal-related representation analysis.
+1. Generate a jailbreak artifact under the **vanilla** operational state.
+2. Keep the target model and jailbreak artifact fixed.
+3. Change only the system prompt used to induce the operational state.
+4. Re-evaluate the same artifact across states.
+5. Compare the resulting ASRs.
 
----
+This repository releases the code and artifacts used to study that protocol
+across the three attack families evaluated in the paper: **PAIR**, **LAA**,
+and **AutoDAN**. It includes the cleaned LAA pipeline, paper-specific PAIR and
+AutoDAN operational-state adapters, prompt/data artifacts, and
+representation-level analysis code.
 
-## Key Idea
+## Main findings
 
-Our evaluation separates **attack generation** from **operational-state
-evaluation**:
+- Jailbreak robustness is **state-contingent** rather than a fixed property of a
+  model-attack pair.
+- In **18 of 21** model-attack combinations, at least one non-vanilla state
+  yields a higher ASR than the vanilla state.
+- State-induced shifts also appear under user-shared role prompts, not only
+  under the controlled Big Five prompt family.
+- Hidden representations shift systematically along a refusal-related
+  direction, and these shifts are strongly predictive of jailbreak outcomes.
+- These representation results are intended as **predictive/correlational
+  evidence**, not as a causal claim.
 
-1. A jailbreak artifact is generated under the vanilla operational state.
-2. The target model and jailbreak artifact are kept fixed.
-3. Only the system prompt used to induce the operational state is changed.
-4. The same artifact is evaluated across different operational states.
-5. Attack success rates are compared across states.
-
-This setup allows us to examine whether a robustness measurement obtained in
-one operational state remains stable when the model's context changes.
-
----
-
-## Repository Structure
+## Repository structure
 
 ```text
 .
 ├── attacks/
 │   ├── generate_suffixes.py
-│   ├── evaluate_personas.py
+│   ├── evaluate_operational_states.py
+│   ├── evaluate_paraphrases.py
+│   ├── evaluate_user_shared_prompts.py
+│   ├── judge_responses.py
 │   ├── laa_attack.py
 │   ├── model_loader.py
 │   ├── language_models.py
+│   ├── common.py
 │   ├── prompts.py
 │   ├── personality_prompts.py
 │   ├── judges.py
 │   ├── config.py
-│   └── utils.py
+│   ├── utils.py
+│   ├── pair/
+│   │   ├── generate_artifacts.py
+│   │   ├── evaluate_operational_states.py
+│   │   ├── upstream_system_prompts.py
+│   │   └── README.md
+│   └── autodan/
+│       ├── prepare_artifacts.py
+│       ├── evaluate_operational_states.py
+│       └── README.md
 │
 ├── datasets/
-│   └── advbench_520_classified.csv
+│   ├── README.md
+│   ├── advbench_50.csv
+│   ├── advbench_520_classified.csv
+│   └── user_shared_prompts.csv
 │
 ├── prompts/
+│   ├── big_five_prompts.md
 │   ├── big_five_paraphrases.md
-│   └── user_shared_prompts.md
+│   ├── paraphrase_generation.md
+│   ├── user_shared_prompts.md
+│   └── user_shared_prompt_selection.md
 │
 ├── refusal_analysis/
 │   ├── extract_hidden_states.py
+│   ├── extract_state_hidden_states.py
 │   ├── train_probe.py
+│   ├── evaluate_probe_transfer.py
 │   ├── analyze_paraphrase_projection.py
 │   └── personality_prompts_semantic.py
 │
+├── scripts/
+│   ├── generate_paraphrase_candidates.py
+│   ├── filter_paraphrase_candidates.py
+│   └── sample_user_shared_prompts.py
+│
+├── analysis/
+│   └── compute_ssi.py
+│
 ├── intro_figure.pdf
 ├── intro_figure.png
+├── licenses/
+│   ├── LAA_LICENSE
+│   ├── PAIR_LICENSE
+│   ├── AUTODAN_LICENSE
+│   └── ADVBENCH_LICENSE
+├── requirements.txt
+├── LICENSE
+├── .env.example
 ├── THIRD_PARTY_NOTICES.md
 ├── .gitignore
 └── README.md
 ```
 
----
+## Requirements
 
-## Released Artifacts
+- **Python 3.10** (the repository CI is tested with Python 3.10)
+- Python packages in [`requirements.txt`](requirements.txt)
+- Hugging Face access for gated target models such as Llama-2
+- an OpenAI API key for PAIR generation and GPT-based judging
+- GPU memory appropriate for the selected open-source target model
 
-### Operational-State Prompts
+Install the Python dependencies:
 
-The prompts used to instantiate and analyze operational states are provided in
-[`prompts/`](prompts/).
+```bash
+pip install -r requirements.txt
+```
 
-Currently released prompt artifacts include:
+Set credentials through environment variables rather than editing source code:
 
-- [`big_five_paraphrases.md`](prompts/big_five_paraphrases.md)  
-  Paraphrased variants of the five Big Five persona prompts used in the
-  paraphrase robustness analysis.
+```bash
+export OPENAI_API_KEY=...
+export HF_TOKEN=...
+```
 
-- [`user_shared_prompts.md`](prompts/user_shared_prompts.md)  
-  User-shared role prompts used to evaluate whether state-induced robustness
-  shifts extend beyond the controlled Big Five prompt family.
+See [`.env.example`](.env.example) for the supported variables.
 
-The original Big Five persona prompts used for state conditioning are also
-included in
-[`attacks/personality_prompts.py`](attacks/personality_prompts.py).
+## Quick Start
 
-The Big Five prompts are used as a systematic and reproducible instrument for
-inducing controlled state variation. They are **not** intended to represent a
-canonical or comprehensive distribution of real-world system prompts.
+All three attacks follow the same evaluation principle:
 
----
+```text
+generate attack artifact under vanilla
+        ↓
+keep the artifact fixed
+        ↓
+evaluate vanilla + O / C / E / A / N
+        ↓
+GPT-4 judge
+        ↓
+state-level ASR
+```
 
-## LAA-Based Operational-State Evaluation
+### LAA
 
-The currently released jailbreak evaluation code focuses on experiments based
-on **LLM Adaptive Attacks (LAA)**.
+```bash
+python attacks/generate_suffixes.py \
+  --target_model llama2-7b \
+  --csv_path datasets/advbench_50.csv \
+  --sys_mode replace \
+  --results_dir results/laa
 
-The original LAA implementation is adapted so that a jailbreak artifact can be
-generated under the vanilla state and subsequently evaluated across different
-system-prompt-induced operational states.
+python attacks/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --suffix_csv results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv \
+  --results_dir results/laa/eval_llama2-7b \
+  --sys_mode replace \
+  --temperature 0.0
+```
 
-The main scripts are:
+### PAIR
 
-### 1. Jailbreak Artifact Generation
+PAIR generation uses the paper-reported attacker model
+`gpt-3.5-turbo-1106` by default.
 
-[`attacks/generate_suffixes.py`](attacks/generate_suffixes.py)
+```bash
+python attacks/pair/generate_artifacts.py \
+  --target_model llama2-7b \
+  --csv_path datasets/advbench_50.csv \
+  --output_csv results/pair/llama2-7b_pair_artifacts.csv
 
-Generates jailbreak artifacts using the LAA attack.
+python attacks/pair/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --artifact_csv results/pair/llama2-7b_pair_artifacts.csv \
+  --results_dir results/pair/llama2-7b
+```
 
-In the main experimental setting of the paper, jailbreak artifacts are
-generated under the vanilla operational state.
+See [`attacks/pair/README.md`](attacks/pair/README.md) for details.
 
-### 2. State-Conditioned Evaluation
+### AutoDAN
 
-[`attacks/evaluate_personas.py`](attacks/evaluate_personas.py)
+Run the official AutoDAN HGA implementation under the vanilla state first,
+then convert its JSON output and reuse the optimized artifact across states:
 
-Evaluates pre-generated jailbreak artifacts across different operational
-states while keeping the target model and attack artifact fixed.
+```bash
+python attacks/autodan/prepare_artifacts.py \
+  --input_json /path/to/AutoDAN/results/autodan_hga/<result>.json \
+  --output_csv results/autodan/llama2-7b_artifacts.csv
 
-### 3. Operational-State Prompts
+python attacks/autodan/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --artifact_csv results/autodan/llama2-7b_artifacts.csv \
+  --results_dir results/autodan/llama2-7b
+```
 
-[`attacks/personality_prompts.py`](attacks/personality_prompts.py)
+See [`attacks/autodan/README.md`](attacks/autodan/README.md) for the upstream
+generation step and provenance.
 
-Contains the Big Five persona prompts used to induce the five controlled
-non-vanilla operational states:
+### Judge any state-evaluation output
+
+```bash
+python attacks/judge_responses.py \
+  --responses_csv <state-evaluation-output.csv> \
+  --judge_model gpt-4-0613
+```
+
+The paper treats a GPT-4 judge score of **10** as jailbreak success. Both
+`gpt-3.5-turbo-1106` and `gpt-4-0613` are historical model identifiers;
+availability now depends on the API account, and substitutions can change the
+reported results.
+
+## Reproducing the LAA evaluation workflow
+
+Run the following commands from the repository root.
+
+### 1. Generate LAA suffixes under the vanilla state
+
+```bash
+python attacks/generate_suffixes.py \
+    --target_model llama2-7b \
+    --csv_path datasets/advbench_50.csv \
+    --sys_mode replace \
+    --results_dir results/laa
+```
+
+### 2. Evaluate the same suffixes across operational states
+
+```bash
+python attacks/evaluate_operational_states.py \
+    --target_model llama2-7b \
+    --suffix_csv results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv \
+    --results_dir results/laa/eval_llama2-7b \
+    --sys_mode replace \
+    --temperature 0.0
+```
+
+### 3. Score responses with the paper's GPT-4 judge
+
+```bash
+python attacks/judge_responses.py \
+    --responses_csv <stage-2-output.csv> \
+    --judge_model gpt-4-0613
+```
+
+The paper counts a response as a successful jailbreak when the judge assigns
+a score of 10. The exact judge model used in the paper was `gpt-4-0613`.
+Because this is a historical API model identifier, exact reruns depend on
+provider/account availability; substituting another judge model may change the
+reported ASRs. The Stage 2 script also records a rule-based heuristic label for
+diagnostics, but the GPT-based judge is the evaluation used for the reported
+main ASRs.
+
+## Big Five paraphrase evaluation
+
+After constructing or using the released retained paraphrases, evaluate the
+same fixed LAA suffixes under each paraphrase:
+
+```bash
+python attacks/evaluate_paraphrases.py \
+    --target_model llama2-13b \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --results_dir results/paraphrases/llama2-13b \
+    --temperature 0.0
+```
+
+Each trait is written to a separate subdirectory. Score each response CSV with
+`attacks/judge_responses.py`; when a `prompt_num` column is present, the
+judge script reports ASR separately for each retained paraphrase. These judged
+files can also be consumed by
+`refusal_analysis/extract_hidden_states.py` for the representation-level
+paraphrase analysis.
+
+## User-shared system prompt evaluation
+
+The 15 publicly shared role prompts used in Section 6.3 can be evaluated with
+the same fixed LAA suffixes:
+
+```bash
+python attacks/evaluate_user_shared_prompts.py \
+    --target_model llama2-13b \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --prompts_csv datasets/user_shared_prompts.csv \
+    --results_dir results/user_shared/llama2-13b \
+    --temperature 0.0
+```
+
+Then score the responses with the same GPT-4 judge:
+
+```bash
+python attacks/judge_responses.py \
+    --responses_csv <user-shared-output.csv> \
+    --judge_model gpt-4-0613
+```
+
+The documented filtering criteria and the final random sampling step used to
+construct the 15-prompt set are provided in
+`prompts/user_shared_prompt_selection.md` and
+`scripts/sample_user_shared_prompts.py`.
+
+## Reproducing the refusal-related representation analysis
+
+For the main Big Five analysis on Llama-2-13B, first extract hidden states from
+the judged Stage-2 responses:
+
+```bash
+python refusal_analysis/extract_hidden_states.py \
+    --original_csv <stage-3-judged-response.csv> \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --sys_mode replace \
+    --skip_semantic \
+    --output_dir probe_data
+```
+
+Then train the 5-fold stratified logistic-regression probe using only the
+vanilla + five Big Five states:
+
+```bash
+python refusal_analysis/train_probe.py \
+    --npz_path probe_data/hidden_vectors.npz \
+    --output_dir probe_results \
+    --original_only
+```
+
+The script reports AUROC across the early (L4), middle (L16), and late (L32)
+representations and computes projection-ASR correlations across all six
+operational states. State-level projection uncertainty is reported as the
+standard error across the 50 AdvBench queries, matching the analysis protocol
+described in the paper.
+
+### Cross-prompt-family probe evaluation
+
+For Section 6.3, the generic extractor can create comparable NPZ files for
+both the Big Five and user-shared prompt families:
+
+```bash
+python refusal_analysis/extract_state_hidden_states.py \
+    --target_model llama2-13b \
+    --responses_csv <judged-big-five.csv> \
+    --output_npz probe_data/big_five.npz
+
+python refusal_analysis/extract_state_hidden_states.py \
+    --target_model llama2-13b \
+    --responses_csv <judged-user-shared.csv> \
+    --state_prompts_csv datasets/user_shared_prompts.csv \
+    --exclude_state vanilla \
+    --output_npz probe_data/user_shared.npz
+```
+
+A probe trained on one prompt family can then be evaluated on the other:
+
+```bash
+python refusal_analysis/evaluate_probe_transfer.py \
+    --train_npz probe_data/big_five.npz \
+    --test_npz probe_data/user_shared.npz \
+    --layer middle
+```
+
+The representation depth is exposed as a command-line argument rather than
+hard-coded; Appendix B.4 reports results across L4, L16, and L32.
+
+## LAA-based operational-state evaluation
+
+The released attack code focuses on **LLM Adaptive Attacks (LAA)**.
+
+The implementation separates jailbreak artifact generation from
+operational-state evaluation so that the same optimized artifact can be reused
+across different system-prompt-induced states.
+
+### Stage 1: generate jailbreak artifacts
+
+`attacks/generate_suffixes.py`
+
+This stage generates optimized LAA suffixes under the vanilla operational
+state. The main AdvBench subset used in the paper is provided as
+`datasets/advbench_50.csv`.
+
+### Stage 2: evaluate fixed artifacts across states
+
+`attacks/evaluate_operational_states.py`
+
+This stage evaluates pre-generated artifacts under vanilla and the five Big
+Five persona-conditioned operational states while keeping the attack artifact
+fixed.
+
+The five controlled non-vanilla states are:
 
 - Openness
 - Conscientiousness
@@ -167,14 +423,83 @@ non-vanilla operational states:
 - Agreeableness
 - Neuroticism
 
-### 4. Model and Evaluation Utilities
+The original state prompts are defined in
+`attacks/personality_prompts.py`.
 
-The remaining files in [`attacks/`](attacks/) provide model loading,
-prompt formatting, attack logic, judging, and shared utilities.
+## Prompt artifacts
 
----
+The `prompts/` directory contains prompt material used in the paper.
 
-## Models and Attacks in the Paper
+- `big_five_paraphrases.md`: the retained paraphrases used to test whether the
+  observed effects are robust to semantically similar prompt wording.
+- `paraphrase_generation.md`: the candidate-generation prompt and BERTScore /
+  word-count filtering procedure used to construct the retained paraphrases.
+- `user_shared_prompts.md`: the 15 user-shared role prompts used to test
+  whether state-induced shifts extend beyond the controlled Big Five prompt
+  family.
+- `user_shared_prompt_selection.md`: the inclusion/exclusion criteria and
+  sampling procedure used to construct the 15-prompt set.
+
+The Big Five prompts are used as a **systematic and reproducible intervention
+basis** for operational-state variation. They are not intended to approximate
+the full distribution of system prompts encountered in deployment.
+
+## Reproducing Big Five paraphrase construction
+
+The exact retained paraphrases used in the experiments are released in
+`prompts/big_five_paraphrases.md`. To reproduce the construction procedure,
+the repository also includes the candidate-generation and filtering scripts:
+
+```bash
+python scripts/generate_paraphrase_candidates.py \
+    --output_dir paraphrase_candidates
+
+python scripts/filter_paraphrase_candidates.py \
+    --input_dir paraphrase_candidates \
+    --output_csv paraphrase_candidates/retained.csv
+```
+
+The paper generated 20 candidates per trait with `gpt-4o-2024-08-06` and
+retained candidates with BERTScore F1 ≥ 0.9 and word count within ±10% of the
+reference prompt. The paper does not specify additional decoding parameters
+for candidate generation, so the release does not impose an unreported value.
+See `prompts/paraphrase_generation.md` for the full procedure.
+
+## Representation-level analysis
+
+The `refusal_analysis/` directory contains code for the representation
+analysis reported in the paper.
+
+The pipeline consists of:
+
+1. `extract_hidden_states.py` — extract hidden representations immediately
+   before response generation.
+2. `train_probe.py` — train a logistic-regression probe that separates
+   jailbreak success from failure and derive a refusal-related direction.
+3. `analyze_paraphrase_projection.py` — analyze projections onto that
+   direction, including the paraphrase analysis.
+
+The purpose of this analysis is to characterize a representation-level
+association with state-dependent robustness. It should not be interpreted as
+establishing a causal mechanism.
+
+## State Sensitivity Indicator (SSI)
+
+Section 7 complements ASR with the State Sensitivity Indicator:
+
+```text
+SSI = 1 - 2 * Std(ASR across operational states)
+```
+
+where ASR is represented on a [0, 1] scale and the **population** standard
+deviation is computed across the evaluated states. Given a state-level ASR
+summary from the judge script:
+
+```bash
+python analysis/compute_ssi.py --asr_csv <state-level-asr.csv>
+```
+
+## Models and attacks evaluated in the paper
 
 The paper evaluates seven aligned language models:
 
@@ -186,107 +511,58 @@ The paper evaluates seven aligned language models:
 - Mistral-7B-Instruct
 - Vicuna-7B-v1.5
 
-and three representative jailbreak attacks:
+and three jailbreak attacks:
 
 - **PAIR** — black-box
 - **LAA** — gray-box
 - **AutoDAN** — white-box
 
-The code currently organized in this repository focuses on the
-**LAA-based experimental pipeline**.
+The repository exposes an operational-state evaluation path for all three
+attacks. The LAA code is adapted and cleaned in-repository; PAIR is provided
+through a thin adapter based on the official algorithm and attacker prompts;
+AutoDAN optimization remains in the official upstream repository while this
+release provides artifact conversion and fixed-state evaluation.
 
-For PAIR and AutoDAN, please refer to their original implementations:
+Original implementations:
 
-- [PAIR](https://github.com/patrickrchao/JailbreakingLLMs)
-- [LAA](https://github.com/tml-epfl/llm-adaptive-attacks)
-- [AutoDAN](https://github.com/SheltonLiu-N/AutoDAN)
-
----
-
-## Representation-Level Analysis
-
-The [`refusal_analysis/`](refusal_analysis/) directory contains the code used
-for the representation-level analyses in the paper.
-
-We investigate whether operational-state variation is associated with
-systematic changes in hidden representations along a refusal-related axis.
-
-The analysis pipeline consists of three main stages.
-
-### 1. Hidden-State Extraction
-
-[`refusal_analysis/extract_hidden_states.py`](refusal_analysis/extract_hidden_states.py)
-
-Extracts hidden representations immediately before response generation across
-different operational states.
-
-### 2. Refusal-Related Probe
-
-[`refusal_analysis/train_probe.py`](refusal_analysis/train_probe.py)
-
-Trains a logistic-regression probe to distinguish jailbreak success and
-failure from hidden representations.
-
-The learned weight vector is used as a **refusal-related direction**.
-
-### 3. Projection Analysis
-
-[`refusal_analysis/analyze_paraphrase_projection.py`](refusal_analysis/analyze_paraphrase_projection.py)
-
-Analyzes how representations induced by different operational-state prompts
-project onto the learned refusal-related direction, including the paraphrase
-analysis reported in the paper.
-
-Our representation analysis should be interpreted as a **predictive and
-correlational account** of state-dependent jailbreak robustness, rather than
-as evidence of a causal mechanism.
-
----
+- PAIR: https://github.com/patrickrchao/JailbreakingLLMs
+- LAA: https://github.com/tml-epfl/llm-adaptive-attacks
+- AutoDAN: https://github.com/SheltonLiu-N/AutoDAN
 
 ## Datasets
 
-The [`datasets/`](datasets/) directory contains data used in additional
-analyses reported in the paper.
+The repository includes:
 
-The repository currently includes:
+- `datasets/advbench_50.csv` — the 50-query AdvBench subset used in the main
+  evaluation.
+- `datasets/advbench_520_classified.csv` — AdvBench queries with harm-category
+  annotations used in the scope analysis.
+- `datasets/user_shared_prompts.csv` — user-shared role prompts used in the
+  additional prompt analysis.
 
-- `advbench_520_classified.csv` — AdvBench queries with harm-category
-  annotations used for the scope analysis.
+Please also consult the original dataset releases for their licenses and terms
+of use.
 
-The main experiments in the paper use the AdvBench evaluation subset together
-with additional evaluations on MaliciousInstruct and JailbreakBench.
+## API keys and model access
 
-Please refer to the original dataset releases for their respective licenses
-and terms of use.
+No API keys or Hugging Face credentials are stored in this repository.
 
----
+When required, provide credentials through environment variables such as:
 
-## Dependencies
+```bash
+export OPENAI_API_KEY=...
+export HF_TOKEN=...
+```
 
-The codebase is written in Python and uses libraries including:
+Some Hugging Face models require access approval from their original model
+providers.
 
-- PyTorch
-- Hugging Face Transformers
-- FastChat
-- OpenAI
-- pandas
-- NumPy
-- scikit-learn
-- tqdm
-- BERTScore
+## Third-party code
 
-Some evaluated models require access approval and a Hugging Face token.
+The release contains or depends on MIT-licensed components from the three
+official attack implementations.
 
-A version-pinned environment specification and verified end-to-end
-reproduction commands will be added as the public research code is further
-organized.
-
----
-
-## Third-Party Code
-
-Parts of the jailbreak attack implementation in this repository are adapted
-from:
+Parts of the LAA implementation are adapted from:
 
 **Jailbreaking Leading Safety-Aligned LLMs with Simple Adaptive Attacks**  
 Maksym Andriushchenko, Francesco Croce, and Nicolas Flammarion.
@@ -294,42 +570,58 @@ Maksym Andriushchenko, Francesco Croce, and Nicolas Flammarion.
 Original repository:  
 https://github.com/tml-epfl/llm-adaptive-attacks
 
-The LAA implementation is distributed under the MIT License. The original LAA
-repository itself contains code partially based on the PAIR implementation.
+The original LAA implementation is distributed under the MIT License and
+itself contains code partially based on PAIR. Our modifications add support
+for the operational-state evaluation protocol used in this work.
 
-Our modifications support the operational-state evaluation setting studied in
-this work, including system-prompt conditioning and evaluation of fixed
-jailbreak artifacts across multiple operational states.
+The PAIR adapter vendors the official attacker system prompts and retains the
+PAIR MIT notice. The AutoDAN adapter does not vendor the optimizer; it consumes
+artifacts produced by the official AutoDAN implementation and retains the
+AutoDAN MIT notice.
 
-See
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-for attribution and licensing information.
+See `THIRD_PARTY_NOTICES.md` and `licenses/` for attribution details.
 
----
+## License
+
+The repository's original code is released under the **MIT License**. See
+[`LICENSE`](LICENSE).
+
+Third-party materials retain their original licenses and attribution terms.
+In particular, LAA, PAIR, AutoDAN, and AdvBench materials retain their
+preserved upstream notices under [`licenses/`](licenses/) and are documented
+in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
-If you find this work useful, please cite:
+If you use this work, please cite:
 
 ```bibtex
-@article{park2026fragility,
-  title   = {The Fragility of Jailbreak Robustness Across Operational States},
-  author  = {Park, Yuna and Kim, Hwang Youn and Kim, Yujin and Ro, Won Woo
-             and Kim, Suhyun and Hwang, Jae-In},
-  journal = {arXiv preprint arXiv:2608.30748},
-  year    = {2026}
+@inproceedings{park-etal-2026-fragility,
+    title = "The Fragility of Jailbreak Robustness Across Operational States",
+    author = "Park, Yuna  and
+      Kim, Hwang Youn  and
+      Kim, Yujin  and
+      Ro, Won Woo  and
+      Kim, Suhyun  and
+      Hwang, Jae-In",
+    editor = "Lee, Hung-Yi  and
+      Dev, Sunipa  and
+      Li, Jessy  and
+      Elliott, Desmond",
+    booktitle = "Findings of the Association for Computational Linguistics: EMNLP 2026",
+    month = oct,
+    year = "2026",
+    address = "Budapest, Hungary",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2026.findings-emnlp.1840/",
+    pages = "39277--39298",
+    ISBN = "979-8-89176-462-0"
 }
 ```
 
-The paper was accepted to **Findings of EMNLP 2026**. The official ACL
-Anthology citation will be added after publication.
+## Responsible use
 
----
-
-## Acknowledgements
-
-We thank the authors of the open-source attack implementations and datasets
-used in this work.
-
-For detailed attribution of reused or adapted code, please see
-[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+This repository is intended for research on language-model safety,
+jailbreak evaluation, robustness, and alignment. The included harmful prompts
+originate from established safety-evaluation benchmarks and are provided for
+research and reproducibility.
