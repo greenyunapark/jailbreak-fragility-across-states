@@ -20,6 +20,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 
 LAYER_KEYS = {
@@ -107,13 +108,14 @@ def main():
     )
 
     if args.cross_validate:
-        scaler = StandardScaler()
-        X_train_scaled = scaler.fit_transform(X_train)
-        cv_probe = LogisticRegression(C=1.0, max_iter=1000, random_state=1)
+        cv_estimator = Pipeline([
+            ("scaler", StandardScaler()),
+            ("probe", LogisticRegression(C=1.0, max_iter=1000, random_state=1)),
+        ])
         cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
         scores = cross_val_score(
-            cv_probe,
-            X_train_scaled,
+            cv_estimator,
+            X_train,
             y_train,
             cv=cv,
             scoring="roc_auc",
