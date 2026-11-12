@@ -22,15 +22,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr, f_oneway
 
 
-KNOWN_ASR_13B = {
-    "vanilla":            0,
-    "Openness":          46,
-    "Conscientiousness": 14,
-    "Extraversion":      38,
-    "Agreeableness":      8,
-    "Neuroticism":       52,
-}
-
 TRAITS = ["Openness", "Conscientiousness", "Extraversion", "Agreeableness", "Neuroticism"]
 LAYER_KEYS = {"early": "X_early", "middle": "X_middle", "late": "X_late"}
 TRAIT_COLORS = {
@@ -113,7 +104,17 @@ def main():
     print(f"\n  ANOVA (across traits): F={f_stat:.3f}, p={p_anova:.3f}")
 
     trait_means = df.groupby("trait")["proj_mean"].mean()
-    asr_vals    = [KNOWN_ASR_13B[t] for t in trait_means.index]
+    original_asr = {}
+    for trait in TRAITS:
+        mask = (personas == trait) & (prompt_nums == "original")
+        if mask.sum() > 0:
+            original_asr[trait] = float(y[mask].mean() * 100.0)
+
+    missing = [t for t in trait_means.index if t not in original_asr]
+    if missing:
+        raise ValueError(f"Missing original-prompt labels for: {missing}")
+
+    asr_vals = [original_asr[t] for t in trait_means.index]
     r_p, p_p    = pearsonr(trait_means.values, asr_vals)
     r_s, p_s    = spearmanr(trait_means.values, asr_vals)
     print(f"\n  Trait mean projection vs ASR:")
@@ -146,7 +147,7 @@ def main():
     ax.legend(fontsize=9)
 
     ax2 = ax.twinx()
-    ax2.plot(positions, [KNOWN_ASR_13B[t] for t in TRAITS],
+    ax2.plot(positions, [original_asr[t] for t in TRAITS],
              "D--", color="crimson", lw=1.5, ms=7, label="ASR (%)")
     ax2.set_ylabel("ASR (%)", color="crimson", fontsize=12)
     ax2.tick_params(axis="y", labelcolor="crimson")
@@ -159,7 +160,7 @@ def main():
                    label=trait[:3], zorder=5)
     for trait in TRAITS:
         sub = df[df["trait"] == trait]
-        ax.scatter(sub["proj_mean"].mean(), KNOWN_ASR_13B[trait],
+        ax.scatter(sub["proj_mean"].mean(), original_asr[trait],
                    color=TRAIT_COLORS[trait], s=150, marker="D",
                    edgecolors="black", lw=1.5, zorder=6)
 
