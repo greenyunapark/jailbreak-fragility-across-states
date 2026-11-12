@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Virtual environments
 .venv/
@@ -10,8 +11,9 @@ env/
 # Environment variables / API keys
 .env
 .env.*
+!.env.example
 
-# Model weights
+# Model weights and large artifacts
 *.pt
 *.pth
 *.bin
@@ -21,10 +23,17 @@ env/
 # Experiment outputs
 outputs/
 results/
-
-# Logs
-*.log
+results_*/
+probe_data/
+probe_results/
 wandb/
+*.log
+
+# Local archives / scratch
+*.tar
+*.tar.gz
+*.zip
+.claude/
 
 # Jupyter
 .ipynb_checkpoints/
