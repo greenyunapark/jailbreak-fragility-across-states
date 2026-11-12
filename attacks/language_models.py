@@ -22,7 +22,10 @@ class GPT:
     def __init__(self, model_name):
         self.model_name = model_name
         if 'gpt' in model_name:
-            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY is required for GPT API models.")
+            self.client = OpenAI(api_key=api_key)
         elif 'together' in model_name:
             TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
             self.client = OpenAI(api_key=TOGETHER_API_KEY, base_url='https://api.together.xyz')
@@ -46,7 +49,12 @@ class GPT:
         """
         outputs = []
         for conv in convs:
-            output = self.API_ERROR_OUTPUT
+            output = {
+                "text": self.API_ERROR_OUTPUT,
+                "logprobs": [],
+                "n_input_tokens": 0,
+                "n_output_tokens": 0,
+            }
             for _ in range(self.API_MAX_RETRY):
                 try:
                     request_kwargs = dict(
