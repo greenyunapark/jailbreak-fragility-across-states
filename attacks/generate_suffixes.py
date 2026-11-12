@@ -186,6 +186,6 @@ if __name__ == "__main__":
         args.target_model,
         args.results_dir,
         args.sys_mode,
-        safe_prompt=args.safe_prompt,
         args.n_restarts,
+        safe_prompt=args.safe_prompt,
     )
