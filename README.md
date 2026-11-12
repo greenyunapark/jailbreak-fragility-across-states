@@ -67,7 +67,8 @@ analysis code.
 .
 ├── attacks/
 │   ├── generate_suffixes.py
-│   ├── evaluate_personas.py
+│   ├── evaluate_operational_states.py
+│   ├── judge_responses.py
 │   ├── laa_attack.py
 │   ├── model_loader.py
 │   ├── language_models.py
@@ -81,9 +82,10 @@ analysis code.
 ├── datasets/
 │   ├── advbench_50.csv
 │   ├── advbench_520_classified.csv
-│   └── real-world_prompts.csv
+│   └── user_shared_prompts.csv
 │
 ├── prompts/
+│   ├── big_five_prompts.md
 │   ├── big_five_paraphrases.md
 │   └── user_shared_prompts.md
 │
@@ -95,10 +97,70 @@ analysis code.
 │
 ├── intro_figure.pdf
 ├── intro_figure.png
+├── licenses/
+│   └── LAA_LICENSE
+├── requirements.txt
+├── .env.example
 ├── THIRD_PARTY_NOTICES.md
 ├── .gitignore
 └── README.md
 ```
+
+## Setup
+
+Create a Python environment and install the released dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+For API-based judging and gated Hugging Face models, provide credentials through
+environment variables:
+
+```bash
+export OPENAI_API_KEY=...
+export HF_TOKEN=...
+```
+
+See `.env.example` for the variables used by the codebase.
+
+## Reproducing the LAA evaluation workflow
+
+Run the following commands from the repository root.
+
+### 1. Generate LAA suffixes under the vanilla state
+
+```bash
+python attacks/generate_suffixes.py \
+    --target_model llama2-7b \
+    --csv_path datasets/advbench_50.csv \
+    --sys_mode replace \
+    --results_dir results/laa
+```
+
+### 2. Evaluate the same suffixes across operational states
+
+```bash
+python attacks/evaluate_operational_states.py \
+    --target_model llama2-7b \
+    --suffix_csv results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv \
+    --results_dir results/laa/eval_llama2-7b \
+    --sys_mode replace \
+    --temperature 0.0
+```
+
+### 3. Score responses with the paper's GPT-4 judge
+
+```bash
+python attacks/judge_responses.py \
+    --responses_csv <stage-2-output.csv> \
+    --judge_model gpt-4-0613
+```
+
+The paper counts a response as a successful jailbreak when the judge assigns
+a score of 10. The Stage 2 script also records a rule-based heuristic label for
+diagnostics, but the GPT-based judge is the evaluation used for the reported
+main ASRs.
 
 ## LAA-based operational-state evaluation
 
@@ -118,7 +180,7 @@ state. The main AdvBench subset used in the paper is provided as
 
 ### Stage 2: evaluate fixed artifacts across states
 
-`attacks/evaluate_personas.py`
+`attacks/evaluate_operational_states.py`
 
 This stage evaluates pre-generated artifacts under vanilla and the five Big
 Five persona-conditioned operational states while keeping the attack artifact
@@ -203,7 +265,7 @@ The repository includes:
   evaluation.
 - `datasets/advbench_520_classified.csv` — AdvBench queries with harm-category
   annotations used in the scope analysis.
-- `datasets/real-world_prompts.csv` — user-shared role prompts used in the
+- `datasets/user_shared_prompts.csv` — user-shared role prompts used in the
   additional prompt analysis.
 
 Please also consult the original dataset releases for their licenses and terms
