@@ -225,8 +225,8 @@ def main():
         help="PAIR attacker model reported in the paper.",
     )
     parser.add_argument("--judge_model", type=str, default="gpt-4-0613")
-    parser.add_argument("--n_streams", type=int, default=3)
-    parser.add_argument("--n_iterations", type=int, default=3)
+    parser.add_argument("--n_streams", type=int, default=20)
+    parser.add_argument("--n_iterations", type=int, default=5)
     parser.add_argument("--keep_last_n", type=int, default=4)
     parser.add_argument("--attack_max_n_tokens", type=int, default=500)
     parser.add_argument("--max_n_attack_attempts", type=int, default=5)
