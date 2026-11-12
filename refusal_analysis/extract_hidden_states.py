@@ -8,8 +8,8 @@ Covers:
 Usage:
     python extract_hidden_states.py \
         --original_csv  results/laa/llama2-13b_replace_asr.csv \
+        --suffix_csv    results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
         --semantic_dir  results_semantic/Llama2-13b \
-        --dataset       advbench \
         --sys_mode      replace \
         --output_dir    probe_data
 """
@@ -88,7 +88,13 @@ def load_original_labels(original_csv):
     df["persona_norm"] = df[state_col].replace({"pure": "vanilla"})
 
     if "jailbreak_success" in df.columns:
-        df["label"] = df["jailbreak_success"].astype(bool).astype(int)
+        raw = df["jailbreak_success"]
+        if raw.dtype == bool:
+            df["label"] = raw.astype(int)
+        else:
+            df["label"] = (
+                raw.astype(str).str.strip().str.lower().isin(["true", "1", "yes"])
+            ).astype(int)
     elif "jailbreak_rule" in df.columns:
         df["label"] = (df["jailbreak_rule"] == "succ").astype(int)
     else:
@@ -140,9 +146,8 @@ def main():
                         help="Judged response CSV for vanilla + Big Five states.")
     parser.add_argument("--suffix_csv",      type=str, required=True,
                         help="Stage-1 fixed-suffix CSV produced by generate_suffixes.py.")
-    parser.add_argument("--semantic_dir",    type=str, required=True,
-                        help="Directory containing paraphrase results (e.g. results_semantic/Llama2-13b).")
-    parser.add_argument("--dataset",         type=str, required=True)
+    parser.add_argument("--semantic_dir",    type=str, default=None,
+                        help="Directory containing paraphrase results. Required unless --skip_semantic is set.")
     parser.add_argument("--sys_mode",        type=str, default="replace")
     parser.add_argument("--output_dir",      type=str, default="probe_data")
     parser.add_argument("--prompt_template", type=str, default="best_llama2")
@@ -170,7 +175,12 @@ def main():
     print(f"[suffix] {len(queries)} queries loaded.")
 
     df_original = load_original_labels(args.original_csv)
-    df_semantic = load_semantic_labels(args.semantic_dir)
+    if args.skip_semantic:
+        df_semantic = pd.DataFrame()
+    else:
+        if not args.semantic_dir:
+            raise ValueError("--semantic_dir is required unless --skip_semantic is set.")
+        df_semantic = load_semantic_labels(args.semantic_dir)
 
     class _Args:
         target_model = "llama2-13b"
