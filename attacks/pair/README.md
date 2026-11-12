@@ -14,6 +14,7 @@ The upstream PAIR repository is MIT licensed. Its license is preserved at
 The paper follows the official PAIR configuration and uses:
 
 - attacker model: `gpt-3.5-turbo-1106`
+- `n_streams=20` and `n_iterations=5`, following the official PAIR experimental guidance
 - attack generation under the **vanilla** operational state
 - the generated adversarial prompt is then held fixed across operational states
 - target decoding temperature: 0
