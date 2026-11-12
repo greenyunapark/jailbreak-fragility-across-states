@@ -43,10 +43,11 @@ The central evaluation protocol is simple:
 4. Re-evaluate the same artifact across states.
 5. Compare the resulting ASRs.
 
-This repository releases the code and artifacts used to study that protocol,
-with a cleaned implementation of the **LAA-based evaluation pipeline**,
-operational-state prompts, evaluation datasets, and representation-level
-analysis code.
+This repository releases the code and artifacts used to study that protocol
+across the three attack families evaluated in the paper: **PAIR**, **LAA**,
+and **AutoDAN**. It includes the cleaned LAA pipeline, paper-specific PAIR and
+AutoDAN operational-state adapters, prompt/data artifacts, and
+representation-level analysis code.
 
 ## Main findings
 
@@ -79,7 +80,16 @@ analysis code.
 │   ├── personality_prompts.py
 │   ├── judges.py
 │   ├── config.py
-│   └── utils.py
+│   ├── utils.py
+│   ├── pair/
+│   │   ├── generate_artifacts.py
+│   │   ├── evaluate_operational_states.py
+│   │   ├── upstream_system_prompts.py
+│   │   └── README.md
+│   └── autodan/
+│       ├── prepare_artifacts.py
+│       ├── evaluate_operational_states.py
+│       └── README.md
 │
 ├── datasets/
 │   ├── README.md
@@ -114,6 +124,8 @@ analysis code.
 ├── intro_figure.png
 ├── licenses/
 │   ├── LAA_LICENSE
+│   ├── PAIR_LICENSE
+│   ├── AUTODAN_LICENSE
 │   └── ADVBENCH_LICENSE
 ├── requirements.txt
 ├── LICENSE
@@ -123,23 +135,112 @@ analysis code.
 └── README.md
 ```
 
-## Setup
+## Requirements
 
-Create a Python environment and install the released dependencies:
+- **Python 3.10** (the repository CI is tested with Python 3.10)
+- Python packages in [`requirements.txt`](requirements.txt)
+- Hugging Face access for gated target models such as Llama-2
+- an OpenAI API key for PAIR generation and GPT-based judging
+- GPU memory appropriate for the selected open-source target model
+
+Install the Python dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-For API-based judging and gated Hugging Face models, provide credentials through
-environment variables:
+Set credentials through environment variables rather than editing source code:
 
 ```bash
 export OPENAI_API_KEY=...
 export HF_TOKEN=...
 ```
 
-See `.env.example` for the variables used by the codebase.
+See [`.env.example`](.env.example) for the supported variables.
+
+## Quick Start
+
+All three attacks follow the same evaluation principle:
+
+```text
+generate attack artifact under vanilla
+        ↓
+keep the artifact fixed
+        ↓
+evaluate vanilla + O / C / E / A / N
+        ↓
+GPT-4 judge
+        ↓
+state-level ASR
+```
+
+### LAA
+
+```bash
+python attacks/generate_suffixes.py \
+  --target_model llama2-7b \
+  --csv_path datasets/advbench_50.csv \
+  --sys_mode replace \
+  --results_dir results/laa
+
+python attacks/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --suffix_csv results/laa/results_llama2-7b_advbench_50/LAA_llama2-7b_replace.csv \
+  --results_dir results/laa/eval_llama2-7b \
+  --sys_mode replace \
+  --temperature 0.0
+```
+
+### PAIR
+
+PAIR generation uses the paper-reported attacker model
+`gpt-3.5-turbo-1106` by default.
+
+```bash
+python attacks/pair/generate_artifacts.py \
+  --target_model llama2-7b \
+  --csv_path datasets/advbench_50.csv \
+  --output_csv results/pair/llama2-7b_pair_artifacts.csv
+
+python attacks/pair/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --artifact_csv results/pair/llama2-7b_pair_artifacts.csv \
+  --results_dir results/pair/llama2-7b
+```
+
+See [`attacks/pair/README.md`](attacks/pair/README.md) for details.
+
+### AutoDAN
+
+Run the official AutoDAN HGA implementation under the vanilla state first,
+then convert its JSON output and reuse the optimized artifact across states:
+
+```bash
+python attacks/autodan/prepare_artifacts.py \
+  --input_json /path/to/AutoDAN/results/autodan_hga/<result>.json \
+  --output_csv results/autodan/llama2-7b_artifacts.csv
+
+python attacks/autodan/evaluate_operational_states.py \
+  --target_model llama2-7b \
+  --artifact_csv results/autodan/llama2-7b_artifacts.csv \
+  --results_dir results/autodan/llama2-7b
+```
+
+See [`attacks/autodan/README.md`](attacks/autodan/README.md) for the upstream
+generation step and provenance.
+
+### Judge any state-evaluation output
+
+```bash
+python attacks/judge_responses.py \
+  --responses_csv <state-evaluation-output.csv> \
+  --judge_model gpt-4-0613
+```
+
+The paper treats a GPT-4 judge score of **10** as jailbreak success. Both
+`gpt-3.5-turbo-1106` and `gpt-4-0613` are historical model identifiers;
+availability now depends on the API account, and substitutions can change the
+reported results.
 
 ## Reproducing the LAA evaluation workflow
 
@@ -416,9 +517,11 @@ and three jailbreak attacks:
 - **LAA** — gray-box
 - **AutoDAN** — white-box
 
-This repository currently redistributes and cleans the **LAA-based pipeline**.
-PAIR and AutoDAN experiments in the paper were built from their original
-implementations; we do not redistribute those upstream repositories here.
+The repository exposes an operational-state evaluation path for all three
+attacks. The LAA code is adapted and cleaned in-repository; PAIR is provided
+through a thin adapter based on the official algorithm and attacker prompts;
+AutoDAN optimization remains in the official upstream repository while this
+release provides artifact conversion and fixed-state evaluation.
 
 Original implementations:
 
@@ -456,6 +559,9 @@ providers.
 
 ## Third-party code
 
+The release contains or depends on MIT-licensed components from the three
+official attack implementations.
+
 Parts of the LAA implementation are adapted from:
 
 **Jailbreaking Leading Safety-Aligned LLMs with Simple Adaptive Attacks**  
@@ -464,11 +570,16 @@ Maksym Andriushchenko, Francesco Croce, and Nicolas Flammarion.
 Original repository:  
 https://github.com/tml-epfl/llm-adaptive-attacks
 
-The original implementation is distributed under the MIT License and itself
-contains code partially based on PAIR. Our modifications add support for the
-operational-state evaluation protocol used in this work.
+The original LAA implementation is distributed under the MIT License and
+itself contains code partially based on PAIR. Our modifications add support
+for the operational-state evaluation protocol used in this work.
 
-See `THIRD_PARTY_NOTICES.md` for attribution details.
+The PAIR adapter vendors the official attacker system prompts and retains the
+PAIR MIT notice. The AutoDAN adapter does not vendor the optimizer; it consumes
+artifacts produced by the official AutoDAN implementation and retains the
+AutoDAN MIT notice.
+
+See `THIRD_PARTY_NOTICES.md` and `licenses/` for attribution details.
 
 ## License
 
@@ -476,9 +587,9 @@ The repository's original code is released under the **MIT License**. See
 [`LICENSE`](LICENSE).
 
 Third-party materials retain their original licenses and attribution terms.
-In particular, the adapted LAA implementation and AdvBench-derived data are
-covered by their preserved MIT notices under [`licenses/`](licenses/) and
-documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+In particular, LAA, PAIR, AutoDAN, and AdvBench materials retain their
+preserved upstream notices under [`licenses/`](licenses/) and are documented
+in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
 ## Citation
 
