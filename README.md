@@ -153,7 +153,7 @@ representation-level analysis code.
 - Hugging Face access for gated models such as Llama-2
 - an OpenAI API key only when using PAIR generation or GPT-based judging
 
-The Python dependencies and tested minimum versions are listed in
+The Python dependencies and minimum versions are listed in
 [`requirements.txt`](requirements.txt).
 
 ## Installation
