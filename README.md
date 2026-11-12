@@ -68,6 +68,7 @@ analysis code.
 ├── attacks/
 │   ├── generate_suffixes.py
 │   ├── evaluate_operational_states.py
+│   ├── evaluate_user_shared_prompts.py
 │   ├── judge_responses.py
 │   ├── laa_attack.py
 │   ├── model_loader.py
@@ -80,6 +81,7 @@ analysis code.
 │   └── utils.py
 │
 ├── datasets/
+│   ├── README.md
 │   ├── advbench_50.csv
 │   ├── advbench_520_classified.csv
 │   └── user_shared_prompts.csv
@@ -87,13 +89,17 @@ analysis code.
 ├── prompts/
 │   ├── big_five_prompts.md
 │   ├── big_five_paraphrases.md
-│   └── user_shared_prompts.md
+│   ├── user_shared_prompts.md
+│   └── user_shared_prompt_selection.md
 │
 ├── refusal_analysis/
 │   ├── extract_hidden_states.py
 │   ├── train_probe.py
 │   ├── analyze_paraphrase_projection.py
 │   └── personality_prompts_semantic.py
+│
+├── scripts/
+│   └── sample_user_shared_prompts.py
 │
 ├── intro_figure.pdf
 ├── intro_figure.png
@@ -158,9 +164,66 @@ python attacks/judge_responses.py \
 ```
 
 The paper counts a response as a successful jailbreak when the judge assigns
-a score of 10. The Stage 2 script also records a rule-based heuristic label for
+a score of 10. The exact judge model used in the paper was `gpt-4-0613`. The Stage 2 script also records a rule-based heuristic label for
 diagnostics, but the GPT-based judge is the evaluation used for the reported
 main ASRs.
+
+## User-shared system prompt evaluation
+
+The 15 publicly shared role prompts used in Section 6.3 can be evaluated with
+the same fixed LAA suffixes:
+
+```bash
+python attacks/evaluate_user_shared_prompts.py \
+    --target_model llama2-13b \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --prompts_csv datasets/user_shared_prompts.csv \
+    --results_dir results/user_shared/llama2-13b \
+    --temperature 0.0
+```
+
+Then score the responses with the same GPT-4 judge:
+
+```bash
+python attacks/judge_responses.py \
+    --responses_csv <user-shared-output.csv> \
+    --judge_model gpt-4-0613
+```
+
+The documented filtering criteria and the final random sampling step used to
+construct the 15-prompt set are provided in
+`prompts/user_shared_prompt_selection.md` and
+`scripts/sample_user_shared_prompts.py`.
+
+## Reproducing the refusal-related representation analysis
+
+For the main Big Five analysis on Llama-2-13B, first extract hidden states from
+the judged Stage-2 responses:
+
+```bash
+python refusal_analysis/extract_hidden_states.py \
+    --original_csv <stage-3-judged-response.csv> \
+    --suffix_csv results/laa/results_llama2-13b_advbench_50/LAA_llama2-13b_replace.csv \
+    --sys_mode replace \
+    --skip_semantic \
+    --output_dir probe_data
+```
+
+Then train the 5-fold stratified logistic-regression probe using only the
+vanilla + five Big Five states:
+
+```bash
+python refusal_analysis/train_probe.py \
+    --npz_path probe_data/hidden_vectors.npz \
+    --output_dir probe_results \
+    --original_only
+```
+
+The script reports AUROC across the early (L4), middle (L16), and late (L32)
+representations and computes projection-ASR correlations across all six
+operational states. State-level projection uncertainty is reported as the
+standard error across the 50 AdvBench queries, matching the analysis protocol
+described in the paper.
 
 ## LAA-based operational-state evaluation
 
@@ -206,6 +269,8 @@ The `prompts/` directory contains prompt material used in the paper.
 - `user_shared_prompts.md`: the 15 user-shared role prompts used to test
   whether state-induced shifts extend beyond the controlled Big Five prompt
   family.
+- `user_shared_prompt_selection.md`: the inclusion/exclusion criteria and
+  sampling procedure used to construct the 15-prompt set.
 
 The Big Five prompts are used as a **systematic and reproducible intervention
 basis** for operational-state variation. They are not intended to approximate
