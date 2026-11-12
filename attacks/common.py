@@ -8,7 +8,7 @@ def extract_json(s):
     """Extract the attacker JSON payload containing improvement and prompt."""
     start_pos = s.find("{")
     end_pos = s.find("}") + 1
-    if start_pos == -1 || end_pos == 0:
+    if start_pos == -1 or end_pos == 0:
         logging.error("Error extracting potential JSON structure")
         logging.error("Input:\n%s", s)
         return None, None
