@@ -75,7 +75,13 @@ class GPTJudge(JudgeBase):
 
 
         convs = [self.create_conv(self.get_judge_prompt(prompt, response)) for prompt, response in zip(prompts, responses)]
-        outputs = self.judge_model.generate(convs, max_n_tokens=self.max_n_tokens, temperature=self.temperature, top_p=self.top_p)
+        outputs = self.judge_model.generate(
+            convs,
+            max_n_tokens=self.max_n_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            use_logprobs=False,
+        )
 
 
         for o in outputs:
