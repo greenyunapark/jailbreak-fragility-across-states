@@ -46,3 +46,29 @@ used in the paper:
 https://huggingface.co/datasets/fka/awesome-chatgpt-prompts
 
 The source prompt collection is released under CC0 1.0 Universal.
+
+
+## PAIR
+
+The PAIR release adapter in `attacks/pair/` follows the official
+JailbreakingLLMs implementation:
+
+https://github.com/patrickrchao/JailbreakingLLMs
+
+The file `attacks/pair/upstream_system_prompts.py` is copied from the
+official PAIR repository for reproducibility.
+
+Copyright (c) 2023 PAIR Team. The upstream project is distributed under the
+MIT License. See `licenses/PAIR_LICENSE`.
+
+## AutoDAN
+
+The AutoDAN operational-state adapter in `attacks/autodan/` is designed to
+consume attack artifacts produced by the official AutoDAN implementation:
+
+https://github.com/SheltonLiu-N/AutoDAN
+
+The AutoDAN optimizer itself is not vendored in this repository.
+
+Copyright (c) 2023 Xiaogeng Liu. The upstream project is distributed under the
+MIT License. See `licenses/AUTODAN_LICENSE`.
