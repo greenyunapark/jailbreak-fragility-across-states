@@ -71,7 +71,6 @@ def main():
         response = client.chat.completions.create(
             model=args.model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
         )
         raw = response.choices[0].message.content or ""
         candidates = parse_dict(raw)
