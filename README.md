@@ -89,6 +89,7 @@ analysis code.
 ├── prompts/
 │   ├── big_five_prompts.md
 │   ├── big_five_paraphrases.md
+│   ├── paraphrase_generation.md
 │   ├── user_shared_prompts.md
 │   └── user_shared_prompt_selection.md
 │
@@ -99,12 +100,15 @@ analysis code.
 │   └── personality_prompts_semantic.py
 │
 ├── scripts/
+│   ├── generate_paraphrase_candidates.py
+│   ├── filter_paraphrase_candidates.py
 │   └── sample_user_shared_prompts.py
 │
 ├── intro_figure.pdf
 ├── intro_figure.png
 ├── licenses/
-│   └── LAA_LICENSE
+│   ├── LAA_LICENSE
+│   └── ADVBENCH_LICENSE
 ├── requirements.txt
 ├── .env.example
 ├── THIRD_PARTY_NOTICES.md
@@ -264,8 +268,10 @@ The original state prompts are defined in
 
 The `prompts/` directory contains prompt material used in the paper.
 
-- `big_five_paraphrases.md`: paraphrased variants used to test whether the
+- `big_five_paraphrases.md`: the retained paraphrases used to test whether the
   observed effects are robust to semantically similar prompt wording.
+- `paraphrase_generation.md`: the candidate-generation prompt and BERTScore /
+  word-count filtering procedure used to construct the retained paraphrases.
 - `user_shared_prompts.md`: the 15 user-shared role prompts used to test
   whether state-induced shifts extend beyond the controlled Big Five prompt
   family.
@@ -275,6 +281,27 @@ The `prompts/` directory contains prompt material used in the paper.
 The Big Five prompts are used as a **systematic and reproducible intervention
 basis** for operational-state variation. They are not intended to approximate
 the full distribution of system prompts encountered in deployment.
+
+## Reproducing Big Five paraphrase construction
+
+The exact retained paraphrases used in the experiments are released in
+`prompts/big_five_paraphrases.md`. To reproduce the construction procedure,
+the repository also includes the candidate-generation and filtering scripts:
+
+```bash
+python scripts/generate_paraphrase_candidates.py \
+    --output_dir paraphrase_candidates
+
+python scripts/filter_paraphrase_candidates.py \
+    --input_dir paraphrase_candidates \
+    --output_csv paraphrase_candidates/retained.csv
+```
+
+The paper generated 20 candidates per trait with `gpt-4o-2024-08-06` and
+retained candidates with BERTScore F1 ≥ 0.9 and word count within ±10% of the
+reference prompt. The paper does not specify additional decoding parameters
+for candidate generation, so the release does not impose an unreported value.
+See `prompts/paraphrase_generation.md` for the full procedure.
 
 ## Representation-level analysis
 
